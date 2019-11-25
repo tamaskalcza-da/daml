@@ -16,7 +16,7 @@ import DA.Daml.LF.Evaluator.Eval (runIntProgArg)
 import DA.Daml.LF.Evaluator.Norm (normalize,Config(..),defaultConfig)
 import DA.Daml.LF.Evaluator.Simp (DecodedDar(..),simplify)
 import DA.Daml.LF.Evaluator.Value (Counts(..))
-import DA.Daml.LF.Proto3.Archive (decodeArchive)
+import DA.Daml.LF.Proto3.Archive (decodeArchive, DecodingMode(DecodeAsMain))
 import DA.Daml.LF.Reader (Dalfs(..))
 import qualified DA.Daml.LF.Ast as LF
 import qualified Data.ByteString.Lazy as BSL (ByteString,toStrict)
@@ -31,5 +31,5 @@ decodeDalfs Dalfs{mainDalf,dalfs} = do
   where
     decodeDalf :: BSL.ByteString -> IO (LF.PackageId,LF.Package)
     decodeDalf dalfBS = do
-      Right pair <- return $ decodeArchive $ BSL.toStrict dalfBS
+      Right pair <- return $ decodeArchive DecodeAsMain $ BSL.toStrict dalfBS
       return pair
