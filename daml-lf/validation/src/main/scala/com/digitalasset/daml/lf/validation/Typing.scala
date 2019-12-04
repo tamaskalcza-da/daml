@@ -866,6 +866,8 @@ private[validation] object Typing {
       case ETypeRep(typ) =>
         checkGroundType(typ)
         TTypeRep
+      case EExperimentalBuiltin(_, typ) =>
+        typ
     }
 
     def checkExpr(expr: Expr, typ: Type): Type = {

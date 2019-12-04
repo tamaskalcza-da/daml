@@ -9,7 +9,6 @@ import com.digitalasset.daml.lf.data.Ref._
 import com.digitalasset.daml.lf.data._
 import com.digitalasset.daml.lf.data.Numeric.Scale
 import com.digitalasset.daml.lf.language.Ast
-import com.digitalasset.daml.lf.language.Ast._
 import com.digitalasset.daml.lf.speedy.SError._
 import com.digitalasset.daml.lf.speedy.SExpr._
 import com.digitalasset.daml.lf.speedy.Speedy.{
@@ -735,7 +734,7 @@ object SBuiltin {
   }
 
   /** $tproj[field] :: Struct -> a */
-  final case class SBStructProj(field: FieldName) extends SBuiltin(1) {
+  final case class SBStructProj(field: Ast.FieldName) extends SBuiltin(1) {
     def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
       machine.ctrl = CtrlValue(args.get(0) match {
         case SStruct(fields, values) =>
@@ -747,7 +746,7 @@ object SBuiltin {
   }
 
   /** $tupd[field] :: Struct -> a -> Struct */
-  final case class SBStructUpd(field: FieldName) extends SBuiltin(2) {
+  final case class SBStructUpd(field: Ast.FieldName) extends SBuiltin(2) {
     def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
       machine.ctrl = CtrlValue(args.get(0) match {
         case SStruct(fields, values) =>
@@ -761,7 +760,7 @@ object SBuiltin {
   }
 
   /** $vcon[V, variant] :: a -> V */
-  final case class SBVariantCon(id: Identifier, variant: VariantConName) extends SBuiltin(1) {
+  final case class SBVariantCon(id: Identifier, variant: Ast.VariantConName) extends SBuiltin(1) {
     def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
       machine.ctrl = CtrlValue(SVariant(id, variant, args.get(0)))
     }
@@ -1296,7 +1295,7 @@ object SBuiltin {
     *    :: t
     *    -> Any (where t = ty)
     */
-  final case class SBToAny(ty: Type) extends SBuiltin(1) {
+  final case class SBToAny(ty: Ast.Type) extends SBuiltin(1) {
     def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
       machine.ctrl = CtrlValue(SAny(ty, args.get(0)))
     }
@@ -1306,7 +1305,7 @@ object SBuiltin {
     *    :: Any
     *    -> Optional t (where t = expectedType)
     */
-  final case class SBFromAny(expectedTy: Type) extends SBuiltin(1) {
+  final case class SBFromAny(expectedTy: Ast.Type) extends SBuiltin(1) {
     def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
       machine.ctrl = CtrlValue(args.get(0) match {
         case SAny(actualTy, v) =>
@@ -1554,5 +1553,36 @@ object SBuiltin {
 
   private def rightOrArithmeticError[A](message: String, mb: Either[String, A]): A =
     mb.fold(_ => throw DamlEArithmeticError(s"$message"), identity)
+}
+
+object SEExperimentalBuiltin {
+
+  // When adding a new builtin try to let this class self content,
+  // that is add everything you need here.
+
+  import com.digitalasset.daml.lf.language.Ast._
+  import com.digitalasset.daml.lf.language.Util._
+
+  def apply(name: String, typ: Type): SExpr =
+    (name, typ) match {
+      case ("take", TFun(TInt64, TFun(TText, TText))) => SEBuiltin(SBExperimentalTextTake)
+    }
+
+  // Experimental
+  /** $take :: Int64 -> Text -> Text */
+  private final object SBExperimentalTextTake extends SBuiltin(2) {
+    def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
+      var k = Math.toIntExact(args.get(1).asInstanceOf[SInt64].value)
+      val s = args.get(2).asInstanceOf[SText].value
+      var i = -1
+      var next = 0
+      do {
+        k -= 1
+        i = next
+        next = if (s(i).isHighSurrogate) i + 2 else i + 1
+      } while (k > 0)
+      machine.ctrl = CtrlValue(SText(s.substring(i, next)))
+    }
+  }
 
 }
