@@ -264,8 +264,8 @@ instance Pretty BuiltinExpr where
     BEPartyToQuotedText -> "PARTY_TO_QUOTED_TEXT"
     BETextToCodePoints -> "TEXT_TO_CODE_POINTS"
     BETextFromCodePoints -> "TEXT_FROM_CODE_POINTS"
-
     BECoerceContractId -> "COERCE_CONTRACT_ID"
+
     where
       epochToText fmt secs =
         T.pack $
@@ -459,6 +459,7 @@ instance Pretty Expr where
     EToAny ty body -> prettyAppKeyword lvl prec "to_any" [TyArg ty, TmArg body]
     EFromAny ty body -> prettyAppKeyword lvl prec "from_any" [TyArg ty, TmArg body]
     ETypeRep ty -> prettyAppKeyword lvl prec "type_rep" [TyArg ty]
+    EExperimentalBuiltin name _ -> pretty name
 
 instance Pretty DefDataType where
   pPrintPrec lvl _prec (DefDataType mbLoc tcon (IsSerializable serializable) params dataCons) =

@@ -526,6 +526,9 @@ decodeExprSum exprSum = mayDecode "exprSum" exprSum $ \case
     return (EFromAny type' expr)
   LF1.ExprSumTypeRep typ ->
     ETypeRep <$> decodeType typ
+  LF1.ExprSumExperimentalBuiltin (LF1.Expr_ExperimentalBuiltin name mbType) -> do
+    type' <- mayDecode "expr_ExperimentalBuiltin" mbType decodeType
+    return (EExperimentalBuiltin (decodeString name) type')
 
 decodeUpdate :: LF1.Update -> Decode Expr
 decodeUpdate LF1.Update{..} = mayDecode "updateSum" updateSum $ \case

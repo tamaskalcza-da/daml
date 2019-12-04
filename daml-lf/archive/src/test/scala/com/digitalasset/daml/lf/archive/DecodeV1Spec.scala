@@ -28,6 +28,12 @@ class DecodeV1Spec
     with OptionValues
     with TableDrivenPropertyChecks {
 
+  private def buildPrimType(primType: DamlLf1.PrimType, args: DamlLf1.Type*) =
+    DamlLf1.Type
+      .newBuilder()
+      .setPrim(DamlLf1.Type.Prim.newBuilder().setPrim(primType).addAllArgs(args.asJava))
+      .build()
+
   "The entries of primTypeInfos correspond to Protobuf DamlLf1.PrimType" in {
 
     (Set(DamlLf1.PrimType.UNRECOGNIZED, DamlLf1.PrimType.DECIMAL) ++
@@ -151,12 +157,6 @@ class DecodeV1Spec
         }
       }
     }
-
-    def buildPrimType(primType: DamlLf1.PrimType, args: DamlLf1.Type*) =
-      DamlLf1.Type
-        .newBuilder()
-        .setPrim(DamlLf1.Type.Prim.newBuilder().setPrim(primType).addAllArgs(args.asJava))
-        .build()
 
     val decimalTestCases = Table(
       "input" -> "expected output",
@@ -504,11 +504,33 @@ class DecodeV1Spec
       }
     }
 
-    "reject numeric decimal if version >= 1.dev" in {
+    "reject numeric decimal if version >= 1.7" in {
 
       forEvery(postNumericMinVersions) { version =>
         val decoder = moduleDecoder(version)
         a[ParseError] shouldBe thrownBy(decoder.decodeExpr(toDecimalProto("0.0"), "test"))
+      }
+    }
+
+    "reject experimental builtins for any version but dev" in {
+      val experimentalBuiltin =
+        DamlLf1.Expr
+          .newBuilder()
+          .setExperimentalBuiltin(
+            DamlLf1.Expr.ExperimentalBuiltin
+              .newBuilder()
+              .setName("unit")
+              .setType(buildPrimType(DamlLf1.PrimType.UNIT)))
+          .build()
+
+      LV.Major.V1.acceptedVersions.foreach { version =>
+        val decoder = moduleDecoder(version)
+        version match {
+          case LV.Minor.Dev =>
+            decoder.decodeExpr(experimentalBuiltin, "test")
+          case _ =>
+            a[ParseError] shouldBe thrownBy(decoder.decodeExpr(experimentalBuiltin, "test"))
+        }
       }
     }
 

@@ -590,7 +590,11 @@ encodeExpr' = \case
         pureExpr $ P.ExprSumFromAny P.Expr_FromAny{..}
     ETypeRep ty -> do
         expr . P.ExprSumTypeRep <$> encodeType' ty
-  where
+    EExperimentalBuiltin name typ -> do
+        expr_ExperimentalBuiltinName <- pure $ encodeString name
+        expr_ExperimentalBuiltinType <- encodeType typ
+        pureExpr $ P.ExprSumExperimentalBuiltin P.Expr_ExperimentalBuiltin{..}
+    where
     expr = P.Expr Nothing . Just
     pureExpr = pure . expr
 

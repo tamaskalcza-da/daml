@@ -610,6 +610,9 @@ final case class Compiler(packages: PackageId PartialFunction Package) {
 
       case ETypeRep(typ) =>
         SEValue(STypeRep(typ))
+
+      case EExperimentalBuiltin(name, typ) =>
+        SEExperimentalBuiltin(name, typ)
     }
 
   @tailrec

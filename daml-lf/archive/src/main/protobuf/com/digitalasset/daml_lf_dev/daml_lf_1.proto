@@ -41,6 +41,7 @@
 //        2019-11-12: Add Generic Map (GenMap)
 //        2019-11-22: Rename Map to TextMap
 //        2019-11-28: Rename Tuple to Struct
+//        2019-12-03: Add (experimental) text primitives.
 
 syntax = "proto3";
 package daml_lf_1;
@@ -512,6 +513,7 @@ enum BuiltinFunction {
 
   TEXT_FROM_CODE_POINTS = 105;  // *Available in versions >= 1.6*
   TEXT_TO_CODE_POINTS = 106; // *Available in versions >= 1.6*
+
   // Next id is 131. 130 is GENMAP_SIZE.
 }
 
@@ -800,6 +802,12 @@ message Expr {
     Expr expr = 2;
   }
 
+  // *Available only in 1.dev*
+  message ExperimentalBuiltin {
+    string name = 1;
+    Type type = 2;
+  }
+
   // Location of the expression in the DAML code source.
   // Optional
   Location location = 25;
@@ -897,6 +905,10 @@ message Expr {
     // A type representation
     // *Available in versions >= 1.7*
     Type type_rep = 32;
+
+    // Hook to add quickly a builtin for testing purpose
+    // *Available in versions 1.dev*
+    ExperimentalBuiltin experimental_builtin = 536870911;
   }
 
   reserved 19; // This was equals. Removed in favour of BuiltinFunction.EQUAL_*

@@ -9,7 +9,6 @@ import com.digitalasset.daml.lf.data.Ref._
 import com.digitalasset.daml.lf.data._
 import com.digitalasset.daml.lf.data.Numeric.Scale
 import com.digitalasset.daml.lf.language.Ast
-import com.digitalasset.daml.lf.language.Ast._
 import com.digitalasset.daml.lf.speedy.SError._
 import com.digitalasset.daml.lf.speedy.SExpr._
 import com.digitalasset.daml.lf.speedy.Speedy.{
@@ -735,7 +734,7 @@ object SBuiltin {
   }
 
   /** $tproj[field] :: Struct -> a */
-  final case class SBStructProj(field: FieldName) extends SBuiltin(1) {
+  final case class SBStructProj(field: Ast.FieldName) extends SBuiltin(1) {
     def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
       machine.ctrl = CtrlValue(args.get(0) match {
         case SStruct(fields, values) =>
@@ -747,7 +746,7 @@ object SBuiltin {
   }
 
   /** $tupd[field] :: Struct -> a -> Struct */
-  final case class SBStructUpd(field: FieldName) extends SBuiltin(2) {
+  final case class SBStructUpd(field: Ast.FieldName) extends SBuiltin(2) {
     def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
       machine.ctrl = CtrlValue(args.get(0) match {
         case SStruct(fields, values) =>
@@ -761,7 +760,7 @@ object SBuiltin {
   }
 
   /** $vcon[V, variant] :: a -> V */
-  final case class SBVariantCon(id: Identifier, variant: VariantConName) extends SBuiltin(1) {
+  final case class SBVariantCon(id: Identifier, variant: Ast.VariantConName) extends SBuiltin(1) {
     def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
       machine.ctrl = CtrlValue(SVariant(id, variant, args.get(0)))
     }
@@ -1296,7 +1295,7 @@ object SBuiltin {
     *    :: t
     *    -> Any (where t = ty)
     */
-  final case class SBToAny(ty: Type) extends SBuiltin(1) {
+  final case class SBToAny(ty: Ast.Type) extends SBuiltin(1) {
     def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
       machine.ctrl = CtrlValue(SAny(ty, args.get(0)))
     }
@@ -1306,7 +1305,7 @@ object SBuiltin {
     *    :: Any
     *    -> Optional t (where t = expectedType)
     */
-  final case class SBFromAny(expectedTy: Type) extends SBuiltin(1) {
+  final case class SBFromAny(expectedTy: Ast.Type) extends SBuiltin(1) {
     def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
       machine.ctrl = CtrlValue(args.get(0) match {
         case SAny(actualTy, v) =>
@@ -1383,5 +1382,204 @@ object SBuiltin {
 
   private def rightOrArithmeticError[A](message: String, mb: Either[String, A]): A =
     mb.fold(_ => throw DamlEArithmeticError(s"$message"), identity)
+}
+
+object SEExperimentalBuiltin {
+
+  // When adding a new builtin try to let this class self content,
+  // that is add everything you need here.
+
+  import com.digitalasset.daml.lf.language.Ast._
+  import com.digitalasset.daml.lf.language.Util._
+
+  def apply(name: String, typ: Type): SExpr =
+    (name, typ) match {
+      case ("$text_to_upper", TFun(TText, TText)) =>
+        SEBuiltin(SBTextToUpper)
+      case ("$text_to_lower ", TFun(TText, TText)) =>
+        SEBuiltin(SBTextToLower)
+      case ("$text_slice", TFun(TInt64, TFun(TInt64, TFun(TText, TText)))) =>
+        SEBuiltin(SBTextSlice)
+      case ("$text_slice_index", TFun(TText, TFun(TText, TOptional(TInt64)))) =>
+        SEBuiltin(SBTextSliceIndex)
+      case ("$text_contains_only", TFun(TText, TFun(TText, TBool))) =>
+        SEBuiltin(SBTextContainsOnly)
+      case ("$text_replicate", TFun(TInt64, TFun(TText, TText))) =>
+        SEBuiltin(SBTextReplicate)
+      case ("$text_split_on", TFun(TText, TFun(TText, TList(TText)))) =>
+        SEBuiltin(SBTextSplitOn)
+      case ("$text_intercalate", TFun(TText, TFun(TList(TText), TText))) =>
+        SEBuiltin(SBTextIntercalate)
+    }
+
+  // Unstable text primitives.
+
+  /** $text_to_upper :: Text -> Text */
+  private object SBTextToUpper extends SBuiltin(1) {
+    def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
+      args.get(0) match {
+        case SText(t) =>
+          machine.ctrl = CtrlValue(SText(t.toUpperCase(util.Locale.ROOT)))
+            // TODO [FM]: replace with ASCII-specific function, or not
+        case x =>
+          throw SErrorCrash(s"type mismatch SBTextoUpper, expected Text got $x")
+      }
+    }
+  }
+
+  /** $text_to_lower :: Text -> Text */
+  private object SBTextToLower extends SBuiltin(1) {
+    def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
+      args.get(0) match {
+        case SText(t) =>
+          machine.ctrl = CtrlValue(SText(t.toLowerCase(util.Locale.ROOT)))
+            // TODO [FM]: replace with ASCII-specific function, or not
+        case x =>
+          throw SErrorCrash(s"type mismatch SBTextToLower, expected Text got $x")
+      }
+    }
+  }
+
+  /** $text_slice :: Int -> Int -> Text -> Text */
+  private object SBTextSlice extends SBuiltin(3) {
+    def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
+      args.get(0) match {
+        case SInt64(from) =>
+          args.get(1) match {
+            case SInt64(to) =>
+              args.get(2) match {
+                case SText(t) =>
+                  val length = t.codePointCount(0, t.length).toLong
+                  if (to <= 0 || from >= length || to <= from ) {
+                    machine.ctrl = CtrlValue(SText(""))
+                  } else {
+                    val rfrom = from.max(0).toInt
+                    val rto = to.min(length).toInt
+                      // NOTE [FM]: We use toInt only after ensuring the indices are
+                      // between 0 and length, inclusive. Calling toInt prematurely
+                      // would mean dropping the high order bits indiscriminitely,
+                      // so for instance (0x100000000L).toInt == 0, resulting in an
+                      // empty string below even though `to` was larger than length.
+                    val ifrom = t.offsetByCodePoints(0, rfrom)
+                    val ito = t.offsetByCodePoints(ifrom, rto - rfrom)
+                    machine.ctrl = CtrlValue(SText(t.slice(ifrom, ito)))
+                  }
+                case x =>
+                  throw SErrorCrash(s"type mismatch SBTextSlice, expected Text got $x")
+              }
+            case x =>
+              throw SErrorCrash(s"type mismatch SBTextSlice, expected Int64 got $x")
+          }
+        case x =>
+          throw SErrorCrash(s"type mismatch SBTextSlice, expected Int64 got $x")
+      }
+    }
+  }
+
+  /** $text_slice_index :: Text -> Text -> Optional Int */
+  private object SBTextSliceIndex extends SBuiltin(2) {
+    def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
+      args.get(0) match {
+        case SText(slice) =>
+          args.get(1) match {
+            case SText(t) =>
+              val n = t.indexOfSlice(slice) // n is -1 if slice is not found.
+              if (n < 0) {
+                machine.ctrl = CtrlValue(SOptional(None))
+              } else {
+                val rn = t.codePointCount(0,n).toLong // we want to return the number of codepoints!
+                machine.ctrl = CtrlValue(SOptional(Some(SInt64(rn))))
+              }
+            case x =>
+              throw SErrorCrash(s"type mismatch SBTextSliceIndex, expected Text got $x")
+          }
+        case x =>
+          throw SErrorCrash(s"type mismatch SBTextSliceIndex, expected Text got $x")
+      }
+    }
+  }
+
+  /** $text_contains_only :: Text -> Text -> Bool */
+  private object SBTextContainsOnly extends SBuiltin(2) {
+    def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
+      args.get(0) match {
+        case SText(alphabet) =>
+          args.get(1) match {
+            case SText(t) =>
+              val alphabetSet = alphabet.codePoints().iterator().asScala.toSet
+              val result = t.codePoints().iterator().asScala.forall(alphabetSet.contains(_))
+              machine.ctrl = CtrlValue(SBool(result))
+            case x =>
+              throw SErrorCrash(s"type mismatch SBTextContainsOnly, expected Text got $x")
+          }
+        case x =>
+          throw SErrorCrash(s"type mismatch SBTextContainsOnly, expected Text got $x")
+      }
+    }
+  }
+
+  /** $text_replicate :: Int -> Text -> Text */
+  private object SBTextReplicate extends SBuiltin(2) {
+    def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
+      args.get(0) match {
+        case SInt64(n) =>
+          args.get(1) match {
+            case SText(t) =>
+              if (n < 0) {
+                machine.ctrl = CtrlValue(SText(""))
+              } else {
+                val rn = n.min(Int.MaxValue.toLong).toInt
+                machine.ctrl = CtrlValue(SText(t * rn))
+              }
+            case x =>
+              throw SErrorCrash(s"type mismatch SBTextReplicate, expected Text got $x")
+          }
+        case x =>
+          throw SErrorCrash(s"type mismatch SBTextReplicate, expected Int64 got $x")
+      }
+    }
+  }
+
+  /** $text_split_on :: Text -> Text -> List Text */
+  private object SBTextSplitOn extends SBuiltin(2) {
+    def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
+      args.get(0) match {
+        case SText(pattern) =>
+          args.get(1) match {
+            case SText(t) =>
+              val seq : Seq[SValue] = t.split(pattern).map(SText).toSeq
+              machine.ctrl = CtrlValue(SList(FrontStack(seq)))
+            case x =>
+              throw SErrorCrash(s"type mismatch SBTextSplitOn, expected Text got $x")
+          }
+        case x =>
+          throw SErrorCrash(s"type mismatch SBTextSplitOn, expected Text got $x")
+      }
+    }
+  }
+
+  /** $text_intercalate :: Text -> List Text -> Text */
+  private object SBTextIntercalate extends SBuiltin(2) {
+    def execute(args: util.ArrayList[SValue], machine: Machine): Unit = {
+      args.get(0) match {
+        case SText(sep) =>
+          args.get(1) match {
+            case SList(vs) =>
+              val xs = vs.map { (v: SValue) =>
+                v match {
+                  case SText(t) => t
+                  case x =>
+                    throw SErrorCrash(s"type mismatch SBTextIntercalate, expected Text in list, got $x")
+                }
+              }
+              machine.ctrl = CtrlValue(SText(xs.iterator.mkString(sep)))
+            case x =>
+              throw SErrorCrash(s"type mismatch SBTextIntercalate, expected List got $x")
+          }
+        case x =>
+          throw SErrorCrash(s"type mismatch SBTextIntercalate, expected Text got $x")
+      }
+    }
+  }
 
 }

@@ -233,6 +233,7 @@ typeOfBuiltin = \case
     TContractId tAlpha :-> TContractId tAlpha :-> TBool
   BECoerceContractId -> do
     pure $ TForall (alpha, KStar) $ TForall (beta, KStar) $ TContractId tAlpha :-> TContractId tBeta
+
   where
     tComparison btype = TBuiltin btype :-> TBuiltin btype :-> TBool
     tBinop typ = typ :-> typ :-> typ
@@ -525,6 +526,7 @@ typeOf = \case
   EUpdate upd -> typeOfUpdate upd
   EScenario scen -> typeOfScenario scen
   ELocation _ expr -> typeOf expr
+  EExperimentalBuiltin _ typ -> pure typ
 
 -- Check that the type contains no type variables or quantifiers
 checkGroundType' :: MonadGamma m => Type -> m ()

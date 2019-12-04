@@ -867,6 +867,11 @@ private[archive] class DecodeV1(minor: LV.Minor) extends Decode.OfPackage[PLF.Pa
           assertSince(LV.Features.typeRep, "Expr.type_rep")
           ETypeRep(decodeType(lfExpr.getTypeRep))
 
+        case PLF.Expr.SumCase.EXPERIMENTAL_BUILTIN =>
+          assertDev("Expr.experimental_builtin")
+          val lfBuiltin = lfExpr.getExperimentalBuiltin
+          EExperimentalBuiltin(lfBuiltin.getName, decodeType(lfBuiltin.getType))
+
         case PLF.Expr.SumCase.SUM_NOT_SET =>
           throw ParseError("Expr.SUM_NOT_SET")
       }
@@ -1180,6 +1185,13 @@ private[archive] class DecodeV1(minor: LV.Minor) extends Decode.OfPackage[PLF.Pa
     if (versionIsOlderThan(minVersion))
       throw ParseError(s"$description is not supported by DAML-LF 1.$minor")
 
+  private[this] def assertDev(description: => String): Unit =
+    languageVersion match {
+      case LV(_, LV.Minor.Dev) =>
+      case _ =>
+        throw ParseError(s"$description is only supported by DAML-LF 1.dev")
+    }
+
   private def assertUndefined(i: Int, description: => String): Unit =
     if (i != 0)
       throw ParseError(s"$description is not supported by DAML-LF 1.$minor")
@@ -1427,7 +1439,7 @@ private[lf] object DecodeV1 {
       BuiltinFunctionInfo(EQUAL_CONTRACT_ID, BEqualContractId),
       BuiltinFunctionInfo(EQUAL_TYPE_REP, BEqualTypeRep),
       BuiltinFunctionInfo(TRACE, BTrace),
-      BuiltinFunctionInfo(COERCE_CONTRACT_ID, BCoerceContractId, minVersion = coerceContractId)
+      BuiltinFunctionInfo(COERCE_CONTRACT_ID, BCoerceContractId, minVersion = coerceContractId),
     )
   }
 
