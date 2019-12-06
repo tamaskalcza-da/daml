@@ -55,7 +55,7 @@ jobs:
   - job: macOS
     timeoutInMinutes: 360
     pool:
-      vmImage: 'macOS-10.14'
+      name: 'macOS-pool'
     variables:
       nix-cache-key: $(Build.StagingDirectory)/macos-nix-key
       nix-cache-path: /tmp/nix-cache/
