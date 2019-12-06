@@ -517,7 +517,7 @@ class DecodeV1Spec
         DamlLf1.Expr
           .newBuilder()
           .setExperimentalBuiltin(
-            DamlLf1.ExperimentalBuiltinFunction
+            DamlLf1.Expr.ExperimentalBuiltin
               .newBuilder()
               .setName("unit")
               .setType(buildPrimType(DamlLf1.PrimType.UNIT)))
