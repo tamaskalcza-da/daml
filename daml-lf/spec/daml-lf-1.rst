@@ -122,7 +122,7 @@ Version: 1.1
 
       For more details, one can refer to the `Abstract Syntax`_,
       `Operational semantics`_ and `Type system`_ sections. There, the
-      option type is denoted by ``'Option'`` and populated thanks to
+      option type is denoted by ``'Optional'`` and populated thanks to
       the constructor ``'None'`` and ``'Some'``.
 
     * **Add** built-in functions to order party literals.
@@ -564,7 +564,7 @@ Then we can define our kinds, types, and expressions::
        |  'Unit'                                    -- BTyUnit
        |  'Bool'                                    -- BTyBool
        |  'List'                                    -- BTyList
-       |  'Option'                                  -- BTyOption
+       |  'Optional'                                -- BTyOptional
        |  'TextMap'                                 -- BTTextMap: map with string keys
        |  'GenMap'                                  -- BTGenMap: map with general value keys
        |  'Update'                                  -- BTyUpdate
@@ -612,8 +612,8 @@ Then we can define our kinds, types, and expressions::
        |  ⟨ e₁ 'with' f = e₂ ⟩                      -- ExpStructUpdate: Struct update
        |  'Nil' @τ                                  -- ExpListNil: Empty list
        |  'Cons' @τ e₁ e₂                           -- ExpListCons: Cons list
-       |  'None' @τ                                 -- ExpOptionNone: Empty Option
-       |  'Some' @τ e                               -- ExpOptionSome: Non-empty Option
+       |  'None' @τ                                 -- ExpOptionalNone: Empty Optional
+       |  'Some' @τ e                               -- ExpOptionalSome: Non-empty Optional
        |  [t₁ ↦ e₁; …; tₙ ↦ eₙ]                     -- ExpTextMap
        | 〚e₁ ↦ e₁; …; eₙ ↦ eₙ'〛                 -- ExpGenMap
        | 'to_any' @τ t                              -- ExpToAny: Wrap a value of the given type in Any
@@ -747,6 +747,49 @@ The section describes the type system of language and introduces some
 other restrictions over programs that are statically verified at
 loading.
 
+Type synonym resolution
+~~~~~~~~~~~~~~~~~~~~~~~
+
+
+  ————————————————————————————————————————————— RewriteVar
+   α  ↠  α
+
+  ————————————————————————————————————————————— RewriteNat
+   n  ↠  n
+
+  ————————————————————————————————————————————— RewriteBuiltin
+   BuiltinType ↠ BuiltinType    
+
+   τ₁  ↠  σ₁        τ₂  ↠  σ₂
+  ————————————————————————————————————————————— RewriteApp
+   τ₁ τ₂  ↠  σ₁ σ₂
+
+   τ  ↠  τ'
+  ————————————————————————————————————————————— RewriteForall
+   ∀ α : k . τ  ↠  ∀ α : k . τ'
+
+   'synonym' T (α₁:k₁) … (αₙ:kₙ) ↦ τ ∈ 〚Ξ〛Mod
+   τ  ↠  σ    τ₁  ↠  σ₁  ⋯  τₙ  ↠  σₙ
+  ————————————————————————————————————————————— RewriteText
+   'Mod:T' τ₁ ⋯ τₙ  ↠  σ[α₁ ↦ σ₁, …, αₙ ↦ σₙ]
+
+   'record' T ⋯ ↦ ⋯ ∈ 〚Ξ〛Mod
+  ————————————————————————————————————————————— RewriteText
+   'Mod:T' ↠  Mod:T'
+
+   'enum' T ⋯ ↦ ⋯ ∈ 〚Ξ〛Mod
+  ————————————————————————————————————————————— RewriteText
+   'Mod:T' ↠  Mod:T'
+
+   'variant' T ⋯ ↦ ⋯ ∈ 〚Ξ〛Mod
+  ————————————————————————————————————————————— RewriteText
+   'Mod:T' ↠  Mod:T'
+
+    τ₁ ↠ σ₁  ⋯  τₙ  ↠  σₙ
+  ————————————————————————————————————————————— RewriteText
+   ⟨ f₁: τ₁, …, fₘ: τₘ ⟩  ↠  ⟨ f₁: τ₁, …, fₘ: τₘ ⟩       
+  
+
 
 Type system
 ~~~~~~~~~~~
@@ -793,10 +836,16 @@ First, we formally defined *well-formed types*. ::
     ————————————————————————————————————————————— TyForall
       Γ  ⊢  ∀ α : k . τ  :  ⋆
 
-    ————————————————————————————————————————————— TyInt64
+    ————————————————————————————————————————————— TyArrow
       Γ  ⊢  'TArrow' : ⋆ → ⋆
 
-    ————————————————————————————————————————————— TyInt64
+    ————————————————————————————————————————————— TyUnit
+      Γ  ⊢  'Unit' : ⋆
+
+    ————————————————————————————————————————————— TyBool
+      Γ  ⊢  'Bool' : ⋆
+
+   ————————————————————————————————————————————— TyInt64
       Γ  ⊢  'Int64' : ⋆
 
     ————————————————————————————————————————————— TyNumeric
@@ -814,20 +863,11 @@ First, we formally defined *well-formed types*. ::
     ————————————————————————————————————————————— TyParty
       Γ  ⊢  'Party' : ⋆
 
-    ————————————————————————————————————————————— TyUnit
-      Γ  ⊢  'Unit' : ⋆
-
-    ————————————————————————————————————————————— TyBool
-      Γ  ⊢  'Bool' : ⋆
-
-    ————————————————————————————————————————————— TyDate
-      Γ  ⊢  'Date' : ⋆
-
     ————————————————————————————————————————————— TyList
       Γ  ⊢  'List' : ⋆ → ⋆
 
-    ————————————————————————————————————————————— TyOption
-      Γ  ⊢  'Option' : ⋆ → ⋆
+    ————————————————————————————————————————————— TyOptional
+      Γ  ⊢  'Optional' : ⋆ → ⋆
 
     ————————————————————————————————————————————— TyTextMap
       Γ  ⊢  'TextMap' : ⋆ → ⋆
@@ -923,12 +963,12 @@ Then we define *well-formed expressions*. ::
       Γ  ⊢  'Cons' @τ eₕ eₜ  :  'List' τ
 
       Γ  ⊢  τ  :  ⋆
-     —————————————————————————————————————————————————————————————— ExpOptionNone
-      Γ  ⊢  'None' @τ  :  'Option' τ
+     —————————————————————————————————————————————————————————————— ExpOptionalNone
+      Γ  ⊢  'None' @τ  :  'Optional' τ
 
       Γ  ⊢  τ  :  ⋆     Γ  ⊢  e  :  τ
-    ——————————————————————————————————————————————————————————————— ExpOptionSome
-      Γ  ⊢  'Some' @τ e  :  'Option' τ
+    ——————————————————————————————————————————————————————————————— ExpOptionalSome
+      Γ  ⊢  'Some' @τ e  :  'Optional' τ
 
       ∀ i,j ∈ 1, …, n  i > j ∨ tᵢ ≤ tⱼ
       Γ  ⊢  e₁  :  τ     Γ  ⊢  eₙ :  τ
@@ -1018,7 +1058,7 @@ Then we define *well-formed expressions*. ::
 
       'synonym' T (α₁:k₁) … (αₙ:kₙ) ↦ τ
       Γ  ⊢  τ₁ : k₁    ⋯     Γ  ⊢  τₙ : kₙ
-      Γ  ↦  e : τ[α₁ ↦ τ₁, …, α₁ ↦ τₙ]
+      Γ  ⊢  e : τ[α₁ ↦ τ₁, …, α₁ ↦ τₙ]
     ——————————————————————————————————————————————————————————————— ExpTypeSynonym
       Γ  ⊢  e : Mod:T τ₁ … τₙ
 
@@ -1057,11 +1097,11 @@ Then we define *well-formed expressions*. ::
     ——————————————————————————————————————————————————————————————— ExpCaseCons
       Γ  ⊢  'case' e₁ 'of' Cons xₕ xₜ → e₂  :  σ
 
-      Γ  ⊢  e₁  : 'Option' τ      Γ  ⊢  e₂  :  σ
+      Γ  ⊢  e₁  : 'Optional' τ      Γ  ⊢  e₂  :  σ
     ——————————————————————————————————————————————————————————————— ExpCaseNone
       Γ  ⊢  'case' e₁ 'of' 'None' → e₂ : σ
 
-      Γ  ⊢  e₁  : 'Option' τ      Γ  ⊢  x : τ · Γ  ⊢  e₂  :  σ
+      Γ  ⊢  e₁  : 'Optional' τ      Γ  ⊢  x : τ · Γ  ⊢  e₂  :  σ
     ——————————————————————————————————————————————————————————————— ExpCaseSome
       Γ  ⊢  'case' e₁ 'of' 'Some' x → e₂  :  σ
 
@@ -1141,7 +1181,7 @@ Then we define *well-formed expressions*. ::
     ——————————————————————————————————————————————————————————————— UpdLookupByKey
       Γ  ⊢  'lookup_by_key' @Mod:T e
               :
-	    'Update' ('Option' (ContractId Mod:T))
+	    'Update' ('Optional' (ContractId Mod:T))
 
       Γ  ⊢  e  :  'Update' τ
     ——————————————————————————————————————————————————————————————— UpdEmbedExpr
@@ -1177,8 +1217,8 @@ types are the types whose values can be persisted on the ledger. ::
       ⊢ₛ  'List' τ
 
       ⊢ₛ  τ
-    ———————————————————————————————————————————————————————————————— STyOption
-      ⊢ₛ  'Option' τ
+    ———————————————————————————————————————————————————————————————— STyOptional
+      ⊢ₛ  'Optional' τ
 
     ———————————————————————————————————————————————————————————————— STyInt64
       ⊢ₛ  'Int64'
@@ -1543,11 +1583,11 @@ need to be evaluated further. ::
    ——————————————————————————————————————————————————— ValExpListCons
      ⊢ᵥ  'Cons' @τ eₕ eₜ
 
-   ——————————————————————————————————————————————————— ValExpOptionNone
+   ——————————————————————————————————————————————————— ValExpOptionalNone
      ⊢ᵥ  'None' @τ
 
      ⊢ᵥ  e
-   ——————————————————————————————————————————————————— ValExpOptionSome
+   ——————————————————————————————————————————————————— ValExpOptionalSome
      ⊢ᵥ  'Some' @τ e
 
      ⊢ᵥ  e₁    ⋯    ⊢ᵥ eₙ
@@ -1739,11 +1779,11 @@ will always be used to compare values of same types::
   ——————————————————————————————————————————————————— GenEqListCons
    'Cons' @τ vₕ vₜ  ~ᵥ 'Cons' @τ wₜ wₜ
 
-  ——————————————————————————————————————————————————— GenEqOptionNone
+  ——————————————————————————————————————————————————— GenEqOptionalNone
    'None' @τ ~ᵥ 'None' @σ
 
    v ~ᵥ w
-  ——————————————————————————————————————————————————— GenEqOptionSome
+  ——————————————————————————————————————————————————— GenEqOptionalSome
    'Some' @τ v ~ᵥ 'Some' @σ w
 
    v₁ ~ᵥ v₁     …       vₘ ~ᵥ wₘ
