@@ -6,7 +6,6 @@ package com.digitalasset.daml.lf.types
 import com.digitalasset.daml.lf.data.Ref._
 import com.digitalasset.daml.lf.data.{ImmArray, Time}
 import com.digitalasset.daml.lf.transaction.Node._
-import com.digitalasset.daml.lf.transaction.NodeInfo
 import com.digitalasset.daml.lf.transaction.Transaction
 import com.digitalasset.daml.lf.value.Value
 import Value._
@@ -559,7 +558,7 @@ object Ledger {
         parentWitnesses: Set[Party],
         nid: Transaction.NodeId,
         node: Transaction.Node): (Set[Party], EnrichState) = {
-      val witnesses = parentWitnesses union NodeInfo.informeesOfNode(node)
+      val witnesses = parentWitnesses union node.info.informeesOfNode
       witnesses ->
         copy(
           disclosures = disclosures
