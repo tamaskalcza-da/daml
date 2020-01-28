@@ -10,7 +10,7 @@ import com.daml.ledger.participant.state.v1.{
   ParticipantId,
   SubmissionResult,
   SubmitterInfo,
-  TransactionMeta
+  TransactionMeta,
 }
 import com.digitalasset.api.util.TimeProvider
 import com.digitalasset.daml.lf.data.{ImmArray, Ref, Time}
@@ -21,7 +21,7 @@ import com.digitalasset.daml.lf.value.Value.{
   AbsoluteContractId,
   ContractInst,
   ValueText,
-  VersionedValue
+  VersionedValue,
 }
 import com.digitalasset.daml.lf.value.ValueVersions
 import com.digitalasset.ledger.api.domain.LedgerId
@@ -29,7 +29,7 @@ import com.digitalasset.ledger.api.testing.utils.{
   AkkaBeforeAndAfterAll,
   MultiResourceBase,
   Resource,
-  SuiteResourceManagementAroundEach
+  SuiteResourceManagementAroundEach,
 }
 import com.digitalasset.logging.LoggingContext.newLoggingContext
 import com.digitalasset.platform.sandbox.{LedgerResource, MetricsAround}
@@ -66,15 +66,17 @@ class ImplicitPartyAdditionIT
   override def timeLimit: Span = scaled(60.seconds)
 
   private val ledgerId: LedgerId = LedgerId("ledgerId")
-  private val participantId: ParticipantId = Ref.LedgerString.assertFromString("participantId")
-  private val timeProvider = TimeProvider.Constant(Instant.EPOCH.plusSeconds(10))
+  private val participantId: ParticipantId =
+    Ref.LedgerString.assertFromString("participantId")
+  private val timeProvider =
+    TimeProvider.Constant(Instant.EPOCH.plusSeconds(10))
 
   private val templateId1: Ref.Identifier = Ref.Identifier(
     Ref.PackageId.assertFromString("packageId"),
     Ref.QualifiedName(
       Ref.ModuleName.assertFromString("moduleName"),
-      Ref.DottedName.assertFromString("name")
-    )
+      Ref.DottedName.assertFromString("name"),
+    ),
   )
 
   private def textValue(t: String) =
@@ -100,25 +102,26 @@ class ImplicitPartyAdditionIT
       ledger: Ledger,
       submitter: String,
       commandId: String,
-      node: GenNode[NodeId, TContractId, Value[TContractId]]): Future[SubmissionResult] = {
+      node: GenNode[NodeId, TContractId, Value[TContractId]],
+  ): Future[SubmissionResult] = {
     val event1: NodeId = NodeId(0)
 
     val transaction = GenTransaction[NodeId, TContractId, Value[TContractId]](
       HashMap(event1 -> node),
       ImmArray(event1),
-      None
+      None,
     )
 
     val submitterInfo = SubmitterInfo(
       Ref.Party.assertFromString(submitter),
       Ref.LedgerString.assertFromString("appId"),
       Ref.LedgerString.assertFromString(commandId),
-      Time.Timestamp.assertFromInstant(MRT)
+      Time.Timestamp.assertFromInstant(MRT),
     )
 
     val transactionMeta = TransactionMeta(
       Time.Timestamp.assertFromInstant(LET),
-      Some(Ref.LedgerString.assertFromString("wfid"))
+      Some(Ref.LedgerString.assertFromString("wfid")),
     )
 
     ledger.publishTransaction(submitterInfo, transactionMeta, transaction)
@@ -139,13 +142,13 @@ class ImplicitPartyAdditionIT
             ContractInst(
               templateId1,
               textValue("some text"),
-              "agreement"
+              "agreement",
             ),
             None,
             Set("create-signatory"),
             Set("create-stakeholder"),
-            Some(KeyWithMaintainers(textValue("some text"), Set("create-signatory")))
-          )
+            Some(KeyWithMaintainers(textValue("some text"), Set("create-signatory"))),
+          ),
         )
         exerciseResult <- publishSingleNodeTx(
           ledger,
@@ -164,8 +167,8 @@ class ImplicitPartyAdditionIT
             Set("exercise-signatory"),
             ImmArray.empty,
             None,
-            None
-          )
+            None,
+          ),
         )
         fetchResult <- publishSingleNodeTx(
           ledger,
@@ -177,8 +180,8 @@ class ImplicitPartyAdditionIT
             None,
             Some(Set("fetch-acting-party")),
             Set("fetch-signatory"),
-            Set("fetch-signatory")
-          )
+            Set("fetch-signatory"),
+          ),
         )
         // Wait until both transactions have been processed
         _ <- ledger
@@ -203,9 +206,13 @@ class ImplicitPartyAdditionIT
     }
   }
 
-  private implicit def toParty(s: String): Ref.Party = Ref.Party.assertFromString(s)
+  private implicit def toParty(s: String): Ref.Party =
+    Ref.Party.assertFromString(s)
 
   private implicit def toLedgerString(s: String): Ref.LedgerString =
     Ref.LedgerString.assertFromString(s)
+
+  private implicit def toContractIdString(s: String): Ref.ContractIdString =
+    Ref.ContractIdString.assertFromString(s)
 
 }

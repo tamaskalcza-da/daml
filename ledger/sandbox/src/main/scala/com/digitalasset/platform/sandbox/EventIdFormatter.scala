@@ -3,7 +3,7 @@
 
 package com.digitalasset.platform.sandbox
 
-import com.digitalasset.daml.lf.data.Ref.{LedgerString, TransactionIdString}
+import com.digitalasset.daml.lf.data.Ref.{ContractIdString, LedgerString, TransactionIdString}
 import com.digitalasset.daml.lf.transaction.Transaction
 import com.digitalasset.daml.lf.types.Ledger
 import com.digitalasset.daml.lf.value.{Value => Lf}
@@ -20,7 +20,7 @@ object EventIdFormatter {
     coid match {
       case a @ Lf.AbsoluteContractId(_) => a
       case Lf.RelativeContractId(txnid, _) =>
-        Lf.AbsoluteContractId(fromTransactionId(transactionId, txnid))
+        Lf.AbsoluteContractId(ContractIdString.fromV0(fromTransactionId(transactionId, txnid)))
     }
 
   // this method defines the EventId format used by the sandbox

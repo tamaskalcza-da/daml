@@ -14,8 +14,9 @@ import scala.util.Try
 
 trait FieldValidations {
 
-  def matchLedgerId(ledgerId: LedgerId)(
-      received: LedgerId): Either[StatusRuntimeException, LedgerId] =
+  def matchLedgerId(
+      ledgerId: LedgerId,
+  )(received: LedgerId): Either[StatusRuntimeException, LedgerId] =
     if (ledgerId == received) Right(received)
     else Left(ledgerIdMismatch(ledgerId, received))
 
@@ -27,7 +28,7 @@ trait FieldValidations {
 
   def requireName(
       s: String,
-      fieldName: String
+      fieldName: String,
   ): Either[StatusRuntimeException, Ref.Name] =
     if (s.isEmpty)
       Left(missingField(fieldName))
@@ -42,7 +43,8 @@ trait FieldValidations {
 
   def requirePackageId(
       s: String,
-      fieldName: String): Either[StatusRuntimeException, Ref.PackageId] =
+      fieldName: String,
+  ): Either[StatusRuntimeException, Ref.PackageId] =
     if (s.isEmpty) Left(missingField(fieldName))
     else Ref.PackageId.fromString(s).left.map(invalidField(fieldName, _))
 
@@ -58,22 +60,31 @@ trait FieldValidations {
 
   def requireLedgerString(
       s: String,
-      fieldName: String
+      fieldName: String,
   ): Either[StatusRuntimeException, Ref.LedgerString] =
     if (s.isEmpty) Left(missingField(fieldName))
     else Ref.LedgerString.fromString(s).left.map(invalidField(fieldName, _))
+
+  def requireContractId(
+      s: String,
+      fieldName: String,
+  ): Either[StatusRuntimeException, Ref.ContractIdString] =
+    if (s.isEmpty) Left(missingField(fieldName))
+    else Ref.ContractIdString.fromString(s).left.map(invalidField(fieldName, _))
 
   def requireLedgerString(s: String): Either[StatusRuntimeException, Ref.LedgerString] =
     Ref.LedgerString.fromString(s).left.map(invalidArgument)
 
   def requireDottedName(
       s: String,
-      fieldName: String): Either[StatusRuntimeException, Ref.DottedName] =
+      fieldName: String,
+  ): Either[StatusRuntimeException, Ref.DottedName] =
     Ref.DottedName.fromString(s).left.map(invalidField(fieldName, _))
 
   def requireNonEmpty[M[_] <: Iterable[_], T](
       s: M[T],
-      fieldName: String): Either[StatusRuntimeException, M[T]] =
+      fieldName: String,
+  ): Either[StatusRuntimeException, M[T]] =
     if (s.nonEmpty) Right(s)
     else Left(missingField(fieldName))
 

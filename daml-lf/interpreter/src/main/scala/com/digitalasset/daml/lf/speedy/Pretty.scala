@@ -62,7 +62,8 @@ object Pretty {
               // is not in nodes, it must not be done yet, hence the contract is recursively
               // exercised.
               case None =>
-                (line + text("Recursive exercise of ") + prettyTypeConName(tid)).nested(4)
+                (line + text("Recursive exercise of ") + prettyTypeConName(tid))
+                  .nested(4)
               case Some(node) =>
                 (line + prettyTransactionNode(node)).nested(4)
             })
@@ -70,7 +71,8 @@ object Pretty {
       case DamlEWronglyTypedContract(coid, expected, actual) =>
         text("Update failed due to wrongly typed contract id") & prettyContractId(coid) /
           text("Expected contract of type") & prettyTypeConName(expected) & text("but got") & prettyTypeConName(
-          actual)
+          actual,
+        )
 
       case DamlESubmitterNotInMaintainers(templateId, submitter, maintainers) =>
         text("Expected the submitter") & prettyParty(submitter) &
@@ -113,15 +115,18 @@ object Pretty {
         text("due to the failure to fetch the contract") & prettyContractId(coid) &
           char('(') + (prettyIdentifier(tid)) + text(").") /
             text("The contract had not been disclosed to the committer") & prettyParty(committer) + char(
-          '.') /
+          '.',
+        ) /
           text("The contract had been disclosed to:") & intercalate(
           comma + space,
-          observers.map(prettyParty)) + char('.')
+          observers.map(prettyParty),
+        ) + char('.')
       case ScenarioErrorCommitError(CommitError.FailedAuthorizations(fas)) =>
         (text("due to failed authorizations:") / prettyFailedAuthorizations(fas)).nested(4)
       case ScenarioErrorCommitError(CommitError.UniqueKeyViolation(gk)) =>
         (text("due to unique key violation for key:") & prettyVersionedValue(false)(gk.gk.key) & text(
-          "for template") & prettyIdentifier(gk.gk.templateId))
+          "for template",
+        ) & prettyIdentifier(gk.gk.templateId))
 
       case ScenarioErrorMustFailSucceeded(tx @ _) =>
         // TODO(JM): Further info needed. Location annotations?
@@ -137,7 +142,8 @@ object Pretty {
         // FIXME(JM): pretty-print all the parameters.
         case (
             nodeId,
-            L.FACreateMissingAuthorization(templateId @ _, optLoc @ _, authorizing, required)) =>
+            L.FACreateMissingAuthorization(templateId @ _, optLoc @ _, authorizing, required),
+            ) =>
           str(nodeId) & text(": missing authorization for create, authorizing parties:") &
             intercalate(comma + space, authorizing.map(prettyParty)) +
               text(", at least all of the following parties need to authorize:") &
@@ -149,7 +155,9 @@ object Pretty {
               templateId @ _,
               optLoc @ _,
               signatories,
-              maintainers)) =>
+              maintainers,
+            ),
+            ) =>
           str(nodeId) & text(": all the maintainers:") &
             intercalate(comma + space, maintainers.map(prettyParty)) +
               text(", need to be signatories:") &
@@ -157,7 +165,8 @@ object Pretty {
 
         case (
             nodeId,
-            L.FAFetchMissingAuthorization(templateId @ _, optLoc @ _, authorizing, stakeholders)) =>
+            L.FAFetchMissingAuthorization(templateId @ _, optLoc @ _, authorizing, stakeholders),
+            ) =>
           str(nodeId) & text(": missing authorization for fetch, authorizing parties:") &
             intercalate(comma + space, authorizing.map(prettyParty)) +
               text(", at least one of the following parties need to authorize:") &
@@ -170,7 +179,9 @@ object Pretty {
               choiceId @ _,
               optLoc @ _,
               authorizing,
-              required)) =>
+              required,
+            ),
+            ) =>
           str(nodeId) & text(": missing authorization for exercise, authorizing parties:") &
             intercalate(comma + space, authorizing.map(prettyParty)) +
               text(", exactly the following parties need to authorize::") &
@@ -194,12 +205,14 @@ object Pretty {
               templateId @ _,
               optLoc @ _,
               maintainers,
-              authorizingParties)) =>
+              authorizingParties,
+            ),
+            ) =>
           str(nodeId) + text(": missing authorization for lookup by key, authorizing parties:") &
             intercalate(comma + space, authorizingParties.map(prettyParty)) +
               text(" are not a superset of maintainers:") &
             intercalate(comma + space, maintainers.map(prettyParty))
-      }
+      },
     )
 
   def prettyValueRef(ref: ValueRef): Doc =
@@ -207,18 +220,19 @@ object Pretty {
 
   def prettyLedger(l: L.Ledger): Doc =
     (text("transactions:") / prettyTransactions(l)) / line +
-      (text("active contracts:") / prettyActiveContracts(l.ledgerData)).nested(3)
+      (text("active contracts:") / prettyActiveContracts(l.ledgerData))
+        .nested(3)
 
   def prettyTransactions(l: L.Ledger): Doc =
     intercalate(line + line, l.scenarioSteps.values.map(prettyScenarioStep(l)))
 
   def prettyLoc(optLoc: Option[Location]): Doc =
     optLoc
-      .map(
-        l =>
-          text("[" + l.module.toString + ":")
-            + str(l.start._1 + 1 /* 0-indexed */ )
-            + text("]"))
+      .map(l =>
+        text("[" + l.module.toString + ":")
+          + str(l.start._1 + 1 /* 0-indexed */ )
+          + text("]"),
+      )
       .getOrElse(text("[unknown source]"))
 
   def prettyScenarioStep(l: L.Ledger)(step: L.ScenarioStep): Doc =
@@ -252,10 +266,9 @@ object Pretty {
         }
       case ea: NodeFetch[AbsoluteContractId] =>
         "ensure active" &: prettyContractId(ea.coid)
-      case ex: NodeExercises[
-            L.ScenarioNodeId,
+      case ex: NodeExercises[L.ScenarioNodeId, AbsoluteContractId, Transaction.Value[
             AbsoluteContractId,
-            Transaction.Value[AbsoluteContractId]] =>
+          ]] =>
         val children =
           if (ex.children.nonEmpty)
             text("children:") / stack(ex.children.toList.map(prettyNodeInfo(l)))
@@ -289,8 +302,8 @@ object Pretty {
                 .map {
                   case (p, txid) =>
                     text(p) & text("(#") + str(txid.id) + char(')')
-                }
-            )
+                },
+            ),
         )
       else
         text("")
@@ -298,7 +311,7 @@ object Pretty {
       if (ni.referencedBy.nonEmpty)
         meta(
           text("referenced by") &
-            intercalate(comma + space, ni.referencedBy.toSeq.map(prettyLedgerNodeId))
+            intercalate(comma + space, ni.referencedBy.toSeq.map(prettyLedgerNodeId)),
         )
       else
         text("")
@@ -309,9 +322,12 @@ object Pretty {
       }
     prettyLedgerNodeId(nodeId) / stack(
       Seq(ppArchivedBy, ppReferencedBy, ppDisclosedTo, arrowRight(ppNode))
-        .filter(_.nonEmpty)
+        .filter(_.nonEmpty),
     )
   }
+
+  def prettyScenarioContractId(n: L.ScenarioContractId): Doc =
+    char('#') + text(n)
 
   def prettyLedgerNodeId(n: L.ScenarioNodeId): Doc =
     char('#') + text(n)
@@ -340,7 +356,8 @@ object Pretty {
       comma + space,
       c.activeContracts.toList
         .sortWith(ltNodeId)
-        .map((acoid: AbsoluteContractId) => prettyLedgerNodeId(L.ScenarioNodeId(acoid))))
+        .map((acoid: AbsoluteContractId) => prettyScenarioContractId(L.ScenarioNodeId(acoid))),
+    )
   }
 
   def prettyPackageId(pkgId: PackageId): Doc =
@@ -408,11 +425,13 @@ object Pretty {
       case ValueBool(b) => str(b)
       case ValueList(lst) =>
         char('[') + intercalate(text(", "), lst.map(prettyValue(true)(_)).toImmArray.toSeq) + char(
-          ']')
+          ']',
+        )
       case ValueTimestamp(t) => str(t)
       case ValueDate(days) => str(days)
       case ValueParty(p) => char('\'') + str(p) + char('\'')
-      case ValueOptional(Some(v1)) => text("Option(") + prettyValue(verbose)(v1) + char(')')
+      case ValueOptional(Some(v1)) =>
+        text("Option(") + prettyValue(verbose)(v1) + char(')')
       case ValueOptional(None) => text("None")
       case ValueTextMap(map) =>
         val list = map.toImmArray.map {
@@ -421,7 +440,8 @@ object Pretty {
         text("TextMap(") + intercalate(text(", "), list.toSeq) + text(")")
       case ValueGenMap(entries) =>
         val list = entries.map {
-          case (k, v) => prettyValue(verbose)(k) + text(" -> ") + prettyValue(verbose)(v)
+          case (k, v) =>
+            prettyValue(verbose)(k) + text(" -> ") + prettyValue(verbose)(v)
         }
         text("GenMap(") + intercalate(text(", "), list.toSeq) + text(")")
     }
@@ -450,7 +470,8 @@ object Pretty {
         case SCPNone => (text("none"), index)
         case SCPSome => (text("some"), index + 1)
       }
-      (pat & text("=>") + lineOrSpace + prettySExpr(newIndex)(alt.body)).nested(2)
+      (pat & text("=>") + lineOrSpace + prettySExpr(newIndex)(alt.body))
+        .nested(2)
     }
     def prettySExpr(index: Int)(e: SExpr): Doc =
       e match {
@@ -474,15 +495,18 @@ object Pretty {
             case SBConsMany(n) => text(s"$$consMany[$n]")
             case SBRecCon(id, fields) =>
               text("$record") + char('[') + text(id.qualifiedName.toString) + char('^') + str(
-                fields.length) + char(']')
+                fields.length,
+              ) + char(']')
             case _: SBRecUpd =>
               text("$update")
             case SBRecProj(id, field) =>
               text("$project") + char('[') + text(id.qualifiedName.toString) + char(':') + str(
-                field) + char(']')
+                field,
+              ) + char(']')
             case SBVariantCon(id, v) =>
               text("$variant") + char('[') + text(id.qualifiedName.toString) + char(':') + text(v) + char(
-                ']')
+                ']',
+              )
             case SBUCreate(ref) =>
               text("$create") + char('[') + text(ref.qualifiedName.toString) + char(']')
             case SBUFetch(ref) =>

@@ -21,7 +21,7 @@ import com.digitalasset.daml.lf.transaction.Node.{
   NodeCreate,
   NodeExercises,
   NodeFetch,
-  NodeLookupByKey
+  NodeLookupByKey,
 }
 import com.digitalasset.daml.lf.value.Value.{
   AbsoluteContractId,
@@ -29,7 +29,7 @@ import com.digitalasset.daml.lf.value.Value.{
   ValueRecord,
   ValueText,
   ValueUnit,
-  VersionedValue
+  VersionedValue,
 }
 import com.digitalasset.daml.lf.value.ValueVersions
 import com.digitalasset.daml_lf_dev.DamlLf
@@ -39,7 +39,7 @@ import com.digitalasset.ledger.api.domain.{
   InclusiveFilters,
   LedgerId,
   RejectionReason,
-  TransactionFilter
+  TransactionFilter,
 }
 import com.digitalasset.ledger.api.testing.utils.AkkaBeforeAndAfterAll
 import com.digitalasset.logging.LoggingContext.newLoggingContext
@@ -74,8 +74,7 @@ class JdbcLedgerDaoSpec
 
   private val nextOffset: () => Long = {
     val counter = new AtomicLong(0)
-    () =>
-      counter.getAndIncrement()
+    () => counter.getAndIncrement()
   }
 
   override def beforeAll(): Unit = {
@@ -107,29 +106,32 @@ class JdbcLedgerDaoSpec
     Ref.PackageId.assertFromString("packageId"),
     Ref.QualifiedName(
       Ref.ModuleName.assertFromString("moduleName"),
-      Ref.DottedName.assertFromString("someTemplate"))
+      Ref.DottedName.assertFromString("someTemplate"),
+    ),
   )
   private val someRecordId = Identifier(
     Ref.PackageId.assertFromString("packageId"),
     Ref.QualifiedName(
       Ref.ModuleName.assertFromString("moduleName"),
-      Ref.DottedName.assertFromString("someRecord"))
+      Ref.DottedName.assertFromString("someRecord"),
+    ),
   )
   private val someValueText = ValueText("some text")
   private val someValueRecord = ValueRecord(
     Some(someRecordId),
-    ImmArray(Some(Ref.Name.assertFromString("field")) -> someValueText))
-  private val someContractKey = VersionedValue(ValueVersions.acceptedVersions.head, someValueText)
+    ImmArray(Some(Ref.Name.assertFromString("field")) -> someValueText),
+  )
+  private val someContractKey =
+    VersionedValue(ValueVersions.acceptedVersions.head, someValueText)
   private val someContractInstance = ContractInst(
     someTemplateId,
     VersionedValue(ValueVersions.acceptedVersions.head, someValueText),
-    someAgreement
+    someAgreement,
   )
 
   private val nextExternalOffset = {
     val n = new AtomicLong(0)
-    () =>
-      Some(Offset(Array.fill(3)(n.getAndIncrement())).toLedgerString)
+    () => Some(Offset(Array.fill(3)(n.getAndIncrement())).toLedgerString)
   }
 
   "JDBC Ledger DAO" should {
@@ -145,7 +147,7 @@ class JdbcLedgerDaoSpec
       val let = Instant.now
       val keyWithMaintainers = KeyWithMaintainers(
         VersionedValue(ValueVersions.acceptedVersions.head, ValueText(s"key-$offset")),
-        Set(alice)
+        Set(alice),
       )
 
       val contract = ActiveContract(
@@ -160,7 +162,7 @@ class JdbcLedgerDaoSpec
         Some(keyWithMaintainers),
         Set(alice, bob),
         Set.empty,
-        someContractInstance.agreementText
+        someContractInstance.agreementText,
       )
 
       val transaction = LedgerEntry.Transaction(
@@ -179,12 +181,13 @@ class JdbcLedgerDaoSpec
               None,
               Set(alice, bob),
               Set(alice, bob),
-              Some(keyWithMaintainers)
-            )),
+              Some(keyWithMaintainers),
+            ),
+          ),
           ImmArray(event1),
-          None
+          None,
         ),
-        Map(event1 -> Set[Party]("Alice", "Bob"), event2 -> Set[Party]("Alice", "In", "Chains"))
+        Map(event1 -> Set[Party]("Alice", "Bob"), event2 -> Set[Party]("Alice", "In", "Chains")),
       )
       for {
         result1 <- ledgerDao.lookupActiveOrDivulgedContract(absCid, alice)
@@ -196,11 +199,10 @@ class JdbcLedgerDaoSpec
             transaction,
             Map.empty,
             Map(
-              absCid -> Set(
-                Ref.Party.assertFromString("Alice"),
-                Ref.Party.assertFromString("Bob"))),
-            List.empty
-          )
+              absCid -> Set(Ref.Party.assertFromString("Alice"), Ref.Party.assertFromString("Bob")),
+            ),
+            List.empty,
+          ),
         )
         result2 <- ledgerDao.lookupActiveOrDivulgedContract(absCid, alice)
         externalLedgerEnd <- ledgerDao.lookupExternalLedgerEnd()
@@ -229,7 +231,8 @@ class JdbcLedgerDaoSpec
           offset,
           offset + 1,
           externalOffset,
-          PersistenceEntry.Checkpoint(checkpoint))
+          PersistenceEntry.Checkpoint(checkpoint),
+        )
         entry <- ledgerDao.lookupLedgerEntry(offset)
         endingOffset <- ledgerDao.lookupLedgerEnd()
         externalLedgerEnd <- ledgerDao.lookupExternalLedgerEnd()
@@ -250,12 +253,14 @@ class JdbcLedgerDaoSpec
 
     def persistAndLoadRejection(externalOffset: Option[LedgerString]) = {
       val offset = nextOffset()
-      val rejection = LedgerEntry.Rejection(
-        Instant.now,
-        s"commandId-$offset",
-        s"applicationId-$offset",
-        "party",
-        RejectionReason.Inconsistent("\uED7Eᇫ뭳ꝳꍆꃓ왎"))
+      val rejection =
+        LedgerEntry.Rejection(
+          Instant.now,
+          s"commandId-$offset",
+          s"applicationId-$offset",
+          "party",
+          RejectionReason.Inconsistent("\uED7Eᇫ뭳ꝳꍆꃓ왎"),
+        )
 
       for {
         startingOffset <- ledgerDao.lookupLedgerEnd()
@@ -263,7 +268,8 @@ class JdbcLedgerDaoSpec
           offset,
           offset + 1,
           externalOffset,
-          PersistenceEntry.Rejection(rejection))
+          PersistenceEntry.Rejection(rejection),
+        )
         entry <- ledgerDao.lookupLedgerEntry(offset)
         endingOffset <- ledgerDao.lookupLedgerEnd()
         externalLedgerEnd <- ledgerDao.lookupExternalLedgerEnd()
@@ -284,7 +290,7 @@ class JdbcLedgerDaoSpec
 
     val defaultConfig = Configuration(
       generation = 0,
-      timeModel = TimeModel.reasonableDefault
+      timeModel = TimeModel.reasonableDefault,
     )
 
     "be able to persist and load configuration" in {
@@ -301,7 +307,7 @@ class JdbcLedgerDaoSpec
           "submission-${offset}",
           Ref.LedgerString.assertFromString("participant-0"),
           defaultConfig,
-          None
+          None,
         )
         optStoredConfig <- ledgerDao.lookupLedgerConfiguration()
         endingOffset <- ledgerDao.lookupLedgerEnd()
@@ -327,17 +333,19 @@ class JdbcLedgerDaoSpec
           s"config-rejection-$offset",
           participantId,
           proposedConfig,
-          Some("bad config")
+          Some("bad config"),
         )
         storedConfig <- ledgerDao.lookupLedgerConfiguration().map(_.map(_._2))
-        entries <- ledgerDao.getConfigurationEntries(offset, offset + 1).runWith(Sink.seq)
+        entries <- ledgerDao
+          .getConfigurationEntries(offset, offset + 1)
+          .runWith(Sink.seq)
 
       } yield {
         response shouldEqual PersistenceResponse.Ok
         startingConfig shouldEqual storedConfig
         entries shouldEqual List(
           offset -> ConfigurationEntry
-            .Rejected(s"config-rejection-$offset", participantId, "bad config", proposedConfig)
+            .Rejected(s"config-rejection-$offset", participantId, "bad config", proposedConfig),
         )
       }
     }
@@ -346,7 +354,9 @@ class JdbcLedgerDaoSpec
       val offset0 = nextOffset()
       val participantId = Ref.LedgerString.assertFromString("participant-0")
       for {
-        config <- ledgerDao.lookupLedgerConfiguration().map(_.map(_._2).getOrElse(defaultConfig))
+        config <- ledgerDao
+          .lookupLedgerConfiguration()
+          .map(_.map(_._2).getOrElse(defaultConfig))
 
         // Store a new configuration with a known submission id
         submissionId = s"refuse-config-$offset0"
@@ -358,7 +368,7 @@ class JdbcLedgerDaoSpec
           submissionId,
           participantId,
           config.copy(generation = config.generation + 1),
-          None
+          None,
         )
         newConfig <- ledgerDao.lookupLedgerConfiguration().map(_.map(_._2).get)
 
@@ -372,7 +382,7 @@ class JdbcLedgerDaoSpec
           submissionId,
           participantId,
           newConfig.copy(generation = config.generation + 1),
-          None
+          None,
         )
 
         // Submission with mismatching generation is rejected
@@ -385,7 +395,7 @@ class JdbcLedgerDaoSpec
           s"refuse-config-$offset2",
           participantId,
           config,
-          None
+          None,
         )
 
         // Submission with unique submissionId and correct generation is accepted.
@@ -399,11 +409,15 @@ class JdbcLedgerDaoSpec
           s"refuse-config-$offset3",
           participantId,
           lastConfig,
-          None
+          None,
         )
-        lastConfigActual <- ledgerDao.lookupLedgerConfiguration().map(_.map(_._2).get)
+        lastConfigActual <- ledgerDao
+          .lookupLedgerConfiguration()
+          .map(_.map(_._2).get)
 
-        entries <- ledgerDao.getConfigurationEntries(offset0, offset3 + 1).runWith(Sink.seq)
+        entries <- ledgerDao
+          .getConfigurationEntries(offset0, offset3 + 1)
+          .runWith(Sink.seq)
       } yield {
         resp0 shouldEqual PersistenceResponse.Ok
         resp1 shouldEqual PersistenceResponse.Duplicate
@@ -419,9 +433,10 @@ class JdbcLedgerDaoSpec
               s"refuse-config-$offset2",
               participantId,
               "Generation mismatch: expected=2, actual=0",
-              config),
+              config,
+            ),
           offset3 -> ConfigurationEntry
-            .Accepted(s"refuse-config-$offset3", participantId, lastConfig)
+            .Accepted(s"refuse-config-$offset3", participantId, lastConfig),
         )
       }
     }
@@ -440,15 +455,18 @@ class JdbcLedgerDaoSpec
             JdbcLedgerDaoSpec.Fixtures.packages
               .map(a => a._1 -> a._2.copy(sourceDescription = Some(firstDescription)))
               .take(1),
-            None)
+            None,
+          )
         secondUploadResult <- ledgerDao
           .storePackageEntry(
             offset2,
             offset2 + 1,
             None,
             JdbcLedgerDaoSpec.Fixtures.packages.map(a =>
-              a._1 -> a._2.copy(sourceDescription = Some(secondDescription))),
-            None)
+              a._1 -> a._2.copy(sourceDescription = Some(secondDescription)),
+            ),
+            None,
+          )
         loadedPackages <- ledgerDao.listLfPackages
       } yield {
         firstUploadResult shouldBe PersistenceResponse.Ok
@@ -465,7 +483,7 @@ class JdbcLedgerDaoSpec
 
       val keyWithMaintainers = KeyWithMaintainers(
         VersionedValue(ValueVersions.acceptedVersions.head, ValueText("key2")),
-        Set(Ref.Party.assertFromString("Alice"))
+        Set(Ref.Party.assertFromString("Alice")),
       )
 
       val transaction = LedgerEntry.Transaction(
@@ -484,12 +502,13 @@ class JdbcLedgerDaoSpec
               None,
               Set(alice, bob),
               Set(alice, bob),
-              Some(keyWithMaintainers)
-            )),
+              Some(keyWithMaintainers),
+            ),
+          ),
           ImmArray(event1),
-          None
+          None,
         ),
-        Map(event1 -> Set("Alice", "Bob"), event2 -> Set("Alice", "In", "Chains"))
+        Map(event1 -> Set("Alice", "Bob"), event2 -> Set("Alice", "In", "Chains")),
       )
 
       for {
@@ -498,7 +517,8 @@ class JdbcLedgerDaoSpec
           offset,
           offset + 1,
           None,
-          PersistenceEntry.Transaction(transaction, Map.empty, Map.empty, List.empty))
+          PersistenceEntry.Transaction(transaction, Map.empty, Map.empty, List.empty),
+        )
         entry <- ledgerDao.lookupLedgerEntry(offset)
         endingOffset <- ledgerDao.lookupLedgerEnd()
       } yield {
@@ -531,7 +551,7 @@ class JdbcLedgerDaoSpec
               None,
               Set(alice, bob),
               Set(alice, bob),
-              None
+              None,
             ),
             event2 -> NodeFetch(
               absCid,
@@ -539,13 +559,13 @@ class JdbcLedgerDaoSpec
               None,
               Some(Set(alice, bob)),
               Set(alice, bob),
-              Set(alice, bob)
-            )
+              Set(alice, bob),
+            ),
           ),
           ImmArray(event1, event2),
-          None
+          None,
         ),
-        Map(event1 -> Set("Alice", "Bob"), event2 -> Set("Alice", "In", "Chains"))
+        Map(event1 -> Set("Alice", "Bob"), event2 -> Set("Alice", "In", "Chains")),
       )
 
       for {
@@ -554,7 +574,8 @@ class JdbcLedgerDaoSpec
           offset,
           offset + 1,
           None,
-          PersistenceEntry.Transaction(transaction, Map.empty, Map.empty, List.empty))
+          PersistenceEntry.Transaction(transaction, Map.empty, Map.empty, List.empty),
+        )
         entry <- ledgerDao.lookupLedgerEntry(offset)
         endingOffset <- ledgerDao.lookupLedgerEnd()
       } yield {
@@ -585,12 +606,13 @@ class JdbcLedgerDaoSpec
                 None,
                 Set(alice, bob),
                 Set(alice, bob),
-                None
-              )),
+                None,
+              ),
+            ),
             ImmArray[EventId](s"event$id"),
-            None
+            None,
           ),
-          Map((s"event$id": EventId) -> Set("Alice", "Bob"))
+          Map((s"event$id": EventId) -> Set("Alice", "Bob")),
         )
       }
 
@@ -621,13 +643,16 @@ class JdbcLedgerDaoSpec
                 Some(
                   VersionedValue(
                     ValueVersions.acceptedVersions.head,
-                    ValueText("some exercise result"))),
-                None
-              )),
+                    ValueText("some exercise result"),
+                  ),
+                ),
+                None,
+              ),
+            ),
             ImmArray[EventId](s"event$id"),
-            None
+            None,
           ),
-          Map((s"event$id": EventId) -> Set("Alice", "Bob"))
+          Map((s"event$id": EventId) -> Set("Alice", "Bob")),
         )
       }
 
@@ -639,7 +664,8 @@ class JdbcLedgerDaoSpec
             offset,
             offset + 1,
             None,
-            PersistenceEntry.Transaction(t, Map.empty, Map.empty, List.empty))
+            PersistenceEntry.Transaction(t, Map.empty, Map.empty, List.empty),
+          )
           .map(_ => ())
       }
 
@@ -651,7 +677,8 @@ class JdbcLedgerDaoSpec
             offset,
             offset + 1,
             None,
-            PersistenceEntry.Transaction(t, Map.empty, Map.empty, List.empty))
+            PersistenceEntry.Transaction(t, Map.empty, Map.empty, List.empty),
+          )
           .map(_ => ())
       }
 
@@ -671,12 +698,14 @@ class JdbcLedgerDaoSpec
       val aliceWildcardFilter =
         EventFilter.byTemplates(TransactionFilter(Map(alice -> Filters(None))))
       val aliceSpecificTemplatesFilter = EventFilter.byTemplates(
-        TransactionFilter(Map(alice -> Filters(InclusiveFilters(Set(someTemplateId))))))
+        TransactionFilter(Map(alice -> Filters(InclusiveFilters(Set(someTemplateId))))),
+      )
 
       val charlieWildcardFilter =
         EventFilter.byTemplates(TransactionFilter(Map(charlie -> Filters(None))))
       val charlieSpecificFilter = EventFilter.byTemplates(
-        TransactionFilter(Map(charlie -> Filters(InclusiveFilters(Set(someTemplateId))))))
+        TransactionFilter(Map(charlie -> Filters(InclusiveFilters(Set(someTemplateId))))),
+      )
 
       val mixedFilter = EventFilter.byTemplates(
         TransactionFilter(
@@ -684,16 +713,20 @@ class JdbcLedgerDaoSpec
             alice -> Filters(InclusiveFilters(Set(someTemplateId))),
             bob -> Filters(None),
             charlie -> Filters(None),
-          )))
+          ),
+        ),
+      )
 
       for {
         startingOffset <- ledgerDao.lookupLedgerEnd()
         aliceStartingSnapshot <- ledgerDao.getActiveContractSnapshot(
           startingOffset,
-          aliceWildcardFilter)
+          aliceWildcardFilter,
+        )
         charlieStartingSnapshot <- ledgerDao.getActiveContractSnapshot(
           startingOffset,
-          charlieWildcardFilter)
+          charlieWildcardFilter,
+        )
 
         mixedStartingSnapshot <- ledgerDao.getActiveContractSnapshot(startingOffset, mixedFilter)
 
@@ -704,17 +737,21 @@ class JdbcLedgerDaoSpec
 
         aliceWildcardSnapshot <- ledgerDao.getActiveContractSnapshot(
           snapshotOffset,
-          aliceWildcardFilter)
+          aliceWildcardFilter,
+        )
         aliceSpecificTemplatesSnapshot <- ledgerDao.getActiveContractSnapshot(
           snapshotOffset,
-          aliceSpecificTemplatesFilter)
+          aliceSpecificTemplatesFilter,
+        )
 
         charlieWildcardSnapshot <- ledgerDao.getActiveContractSnapshot(
           snapshotOffset,
-          charlieWildcardFilter)
+          charlieWildcardFilter,
+        )
         charlieSpecificTemplateSnapshot <- ledgerDao.getActiveContractSnapshot(
           snapshotOffset,
-          charlieSpecificFilter)
+          charlieSpecificFilter,
+        )
 
         mixedSnapshot <- ledgerDao.getActiveContractSnapshot(snapshotOffset, mixedFilter)
 
@@ -722,19 +759,29 @@ class JdbcLedgerDaoSpec
 
         endingOffset <- ledgerDao.lookupLedgerEnd()
 
-        aliceStartingSnapshotSize <- aliceStartingSnapshot.acs.map(_ => 1).runWith(sumSink)
-        aliceWildcardSnapshotSize <- aliceWildcardSnapshot.acs.map(_ => 1).runWith(sumSink)
+        aliceStartingSnapshotSize <- aliceStartingSnapshot.acs
+          .map(_ => 1)
+          .runWith(sumSink)
+        aliceWildcardSnapshotSize <- aliceWildcardSnapshot.acs
+          .map(_ => 1)
+          .runWith(sumSink)
         aliceSpecificTemplatesSnapshotSize <- aliceSpecificTemplatesSnapshot.acs
           .map(_ => 1)
           .runWith(sumSink)
 
-        charlieStartingSnapshotSize <- charlieStartingSnapshot.acs.map(_ => 1).runWith(sumSink)
-        charlieWildcardSnapshotSize <- charlieWildcardSnapshot.acs.map(_ => 1).runWith(sumSink)
+        charlieStartingSnapshotSize <- charlieStartingSnapshot.acs
+          .map(_ => 1)
+          .runWith(sumSink)
+        charlieWildcardSnapshotSize <- charlieWildcardSnapshot.acs
+          .map(_ => 1)
+          .runWith(sumSink)
         charlieSpecificTemplateSnapshotSize <- charlieSpecificTemplateSnapshot.acs
           .map(_ => 1)
           .runWith(sumSink)
 
-        mixedStartingSnapshotSize <- mixedStartingSnapshot.acs.map(_ => 1).runWith(sumSink)
+        mixedStartingSnapshotSize <- mixedStartingSnapshot.acs
+          .map(_ => 1)
+          .runWith(sumSink)
         mixedSnapshotSize <- mixedSnapshot.acs.map(_ => 1).runWith(sumSink)
 
       } yield {
@@ -791,16 +838,19 @@ class JdbcLedgerDaoSpec
                 Some(
                   KeyWithMaintainers(
                     VersionedValue(ValueVersions.acceptedVersions.head, ValueText(key)),
-                    Set(party)))
-              )),
+                    Set(party),
+                  ),
+                ),
+              ),
+            ),
             ImmArray[EventId](s"event$id"),
-            None
+            None,
           ),
-          Map((s"event$id": EventId) -> Set(party))
+          Map((s"event$id": EventId) -> Set(party)),
         ),
         Map.empty,
         Map.empty,
-        List.empty
+        List.empty,
       )
 
     /** A transaction that archives the given contract with the given key */
@@ -833,16 +883,19 @@ class JdbcLedgerDaoSpec
                 key = Some(
                   KeyWithMaintainers(
                     VersionedValue(ValueVersions.acceptedVersions.head, ValueText(key)),
-                    Set(party)))
-              )),
+                    Set(party),
+                  ),
+                ),
+              ),
+            ),
             ImmArray[EventId](s"event$id"),
-            None
+            None,
           ),
-          Map((s"event$id": EventId) -> Set(party))
+          Map((s"event$id": EventId) -> Set(party)),
         ),
         Map.empty,
         Map.empty,
-        List.empty
+        List.empty,
       )
 
     /** A transaction that looks up a key */
@@ -863,17 +916,19 @@ class JdbcLedgerDaoSpec
                 None,
                 KeyWithMaintainers(
                   VersionedValue(ValueVersions.acceptedVersions.head, ValueText(key)),
-                  Set(party)),
+                  Set(party),
+                ),
                 result.map(id => AbsoluteContractId(s"contractId$id")),
-              )),
+              ),
+            ),
             ImmArray[EventId](s"event$id"),
-            None
+            None,
           ),
-          Map((s"event$id": EventId) -> Set(party))
+          Map((s"event$id": EventId) -> Set(party)),
         ),
         Map.empty,
         Map.empty,
-        List.empty
+        List.empty,
       )
 
     /** A transaction that fetches a contract Id */
@@ -896,15 +951,16 @@ class JdbcLedgerDaoSpec
                 actingParties = Some(Set(party)),
                 signatories = Set(party),
                 stakeholders = Set(party),
-              )),
+              ),
+            ),
             ImmArray[EventId](s"event$id"),
-            None
+            None,
           ),
-          Map((s"event$id": EventId) -> Set(party))
+          Map((s"event$id": EventId) -> Set(party)),
         ),
         Map.empty,
         Map.empty,
-        List.empty
+        List.empty,
       )
 
     "refuse to serialize duplicate contract keys" in {
@@ -921,13 +977,13 @@ class JdbcLedgerDaoSpec
           offset1,
           offset1 + 1,
           None,
-          txCreateContractWithKey(let, offset1, alice, keyValue)
+          txCreateContractWithKey(let, offset1, alice, keyValue),
         )
         _ <- ledgerDao.storeLedgerEntry(
           offset2,
           offset2 + 1,
           None,
-          txCreateContractWithKey(let, offset2, alice, keyValue)
+          txCreateContractWithKey(let, offset2, alice, keyValue),
         )
         res1 <- ledgerDao.lookupLedgerEntryAssert(offset1)
         res2 <- ledgerDao.lookupLedgerEntryAssert(offset2)
@@ -948,13 +1004,13 @@ class JdbcLedgerDaoSpec
           offset1,
           offset1 + 1,
           None,
-          txCreateContractWithKey(let, offset1, alice, keyValue)
+          txCreateContractWithKey(let, offset1, alice, keyValue),
         )
         _ <- ledgerDao.storeLedgerEntry(
           offset2,
           offset2 + 1,
           None,
-          txLookupByKey(let, offset2, alice, keyValue, Some(offset1))
+          txLookupByKey(let, offset2, alice, keyValue, Some(offset1)),
         )
         res1 <- ledgerDao.lookupLedgerEntryAssert(offset1)
       } yield {
@@ -976,13 +1032,13 @@ class JdbcLedgerDaoSpec
           offset1,
           offset1 + 1,
           None,
-          txCreateContractWithKey(let, offset1, alice, keyValue)
+          txCreateContractWithKey(let, offset1, alice, keyValue),
         )
         _ <- ledgerDao.storeLedgerEntry(
           offset2,
           offset2 + 1,
           None,
-          txLookupByKey(let, offset2, alice, keyValue, None)
+          txLookupByKey(let, offset2, alice, keyValue, None),
         )
         res1 <- ledgerDao.lookupLedgerEntryAssert(offset1)
         res2 <- ledgerDao.lookupLedgerEntryAssert(offset2)
@@ -1007,19 +1063,19 @@ class JdbcLedgerDaoSpec
           offset1,
           offset1 + 1,
           None,
-          txCreateContractWithKey(let, offset1, alice, keyValue)
+          txCreateContractWithKey(let, offset1, alice, keyValue),
         )
         _ <- ledgerDao.storeLedgerEntry(
           offset2,
           offset2 + 1,
           None,
-          txArchiveContract(let, offset2, alice, offset1, keyValue)
+          txArchiveContract(let, offset2, alice, offset1, keyValue),
         )
         _ <- ledgerDao.storeLedgerEntry(
           offset3,
           offset3 + 1,
           None,
-          txLookupByKey(let, offset3, alice, keyValue, Some(offset1))
+          txLookupByKey(let, offset3, alice, keyValue, Some(offset1)),
         )
         res1 <- ledgerDao.lookupLedgerEntryAssert(offset1)
         res2 <- ledgerDao.lookupLedgerEntryAssert(offset2)
@@ -1042,13 +1098,13 @@ class JdbcLedgerDaoSpec
           offset1,
           offset1 + 1,
           None,
-          txCreateContractWithKey(let, offset1, alice, keyValue)
+          txCreateContractWithKey(let, offset1, alice, keyValue),
         )
         _ <- ledgerDao.storeLedgerEntry(
           offset2,
           offset2 + 1,
           None,
-          txFetch(let, offset2, alice, offset1)
+          txFetch(let, offset2, alice, offset1),
         )
         res1 <- ledgerDao.lookupLedgerEntryAssert(offset1)
         res2 <- ledgerDao.lookupLedgerEntryAssert(offset2)
@@ -1073,19 +1129,19 @@ class JdbcLedgerDaoSpec
           offset1,
           offset1 + 1,
           None,
-          txCreateContractWithKey(let, offset1, alice, keyValue)
+          txCreateContractWithKey(let, offset1, alice, keyValue),
         )
         _ <- ledgerDao.storeLedgerEntry(
           offset2,
           offset2 + 1,
           None,
-          txArchiveContract(let, offset2, alice, offset1, keyValue)
+          txArchiveContract(let, offset2, alice, offset1, keyValue),
         )
         _ <- ledgerDao.storeLedgerEntry(
           offset3,
           offset3 + 1,
           None,
-          txFetch(let, offset3, alice, offset1)
+          txFetch(let, offset3, alice, offset1),
         )
         res1 <- ledgerDao.lookupLedgerEntryAssert(offset1)
         res2 <- ledgerDao.lookupLedgerEntryAssert(offset2)
@@ -1098,11 +1154,14 @@ class JdbcLedgerDaoSpec
     }
   }
 
-  private implicit def toParty(s: String): Ref.Party = Ref.Party.assertFromString(s)
+  private implicit def toParty(s: String): Ref.Party =
+    Ref.Party.assertFromString(s)
 
   private implicit def toLedgerString(s: String): Ref.LedgerString =
     Ref.LedgerString.assertFromString(s)
 
+  private implicit def toContractIdString(s: String): Ref.ContractIdString =
+    Ref.ContractIdString.assertFromString(s)
 }
 
 object JdbcLedgerDaoSpec {

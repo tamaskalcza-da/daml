@@ -59,13 +59,16 @@ object ScenarioLoader {
   def fromScenario(
       packages: InMemoryPackageStore,
       compiledPackages: CompiledPackages,
-      scenario: String): (InMemoryActiveLedgerState, ImmArray[LedgerEntryOrBump], Instant) = {
-    val (scenarioLedger, scenarioRef) = buildScenarioLedger(packages, compiledPackages, scenario)
+      scenario: String,
+  ): (InMemoryActiveLedgerState, ImmArray[LedgerEntryOrBump], Instant) = {
+    val (scenarioLedger, scenarioRef) =
+      buildScenarioLedger(packages, compiledPackages, scenario)
     // we store the tx id since later we need to recover how much to bump the
     // ledger end by, and here the transaction id _is_ the ledger end.
     val ledgerEntries =
       new ArrayBuffer[(ScenarioTransactionId, LedgerEntry)](scenarioLedger.scenarioSteps.size)
-    type Acc = (InMemoryActiveLedgerState, Time.Timestamp, Option[ScenarioTransactionId])
+    type Acc =
+      (InMemoryActiveLedgerState, Time.Timestamp, Option[ScenarioTransactionId])
     val (acs, time, txId) =
       scenarioLedger.scenarioSteps.iterator
         .foldLeft[Acc]((InMemoryActiveLedgerState.empty, Time.Timestamp.Epoch, None)) {
@@ -76,7 +79,8 @@ object ScenarioLoader {
     @tailrec
     def decorateWithIncrement(
         processed: BackStack[LedgerEntryOrBump],
-        toProcess: ImmArray[(ScenarioTransactionId, LedgerEntry)]): ImmArray[LedgerEntryOrBump] = {
+        toProcess: ImmArray[(ScenarioTransactionId, LedgerEntry)],
+    ): ImmArray[LedgerEntryOrBump] = {
 
       def bumps(entryTxId: ScenarioTransactionId, nextTxId: ScenarioTransactionId) =
         if ((nextTxId.index - entryTxId.index) == 1)
@@ -91,7 +95,8 @@ object ScenarioLoader {
             if (processed.isEmpty && entryTxId.index > 0) =>
           val newProcessed = (processed :++ ImmArray(
             LedgerEntryOrBump.Bump(entryTxId.index),
-            LedgerEntryOrBump.Entry(entry))) :++ bumps(entryTxId, nextTxId)
+            LedgerEntryOrBump.Entry(entry),
+          )) :++ bumps(entryTxId, nextTxId)
 
           decorateWithIncrement(newProcessed, entries)
         // the last one just bumps by 1 -- it does not matter as long as it's
@@ -102,7 +107,8 @@ object ScenarioLoader {
         case ImmArrayCons((entryTxId, entry), entries @ ImmArrayCons((nextTxId, next), _)) =>
           val newProcessed = processed :+ LedgerEntryOrBump.Entry(entry) :++ bumps(
             entryTxId,
-            nextTxId)
+            nextTxId,
+          )
 
           decorateWithIncrement(newProcessed, entries)
       }
@@ -113,21 +119,24 @@ object ScenarioLoader {
   private def buildScenarioLedger(
       packages: InMemoryPackageStore,
       compiledPackages: CompiledPackages,
-      scenario: String): (L.Ledger, Ref.DefinitionRef) = {
+      scenario: String,
+  ): (L.Ledger, Ref.DefinitionRef) = {
     val scenarioQualName = getScenarioQualifiedName(packages, scenario)
     val candidateScenarios: List[(Ref.DefinitionRef, LanguageVersion, Definition)] =
       getCandidateScenarios(packages, scenarioQualName)
     val (scenarioRef, scenarioLfVers, scenarioDef) =
       identifyScenario(packages, scenario, candidateScenarios)
     val scenarioExpr = getScenarioExpr(scenarioRef, scenarioDef)
-    val speedyMachine = getSpeedyMachine(scenarioLfVers, scenarioExpr, compiledPackages)
+    val speedyMachine =
+      getSpeedyMachine(scenarioLfVers, scenarioExpr, compiledPackages)
     val scenarioLedger = getScenarioLedger(scenarioRef, speedyMachine)
     (scenarioLedger, scenarioRef)
   }
 
   private def getScenarioLedger(
       scenarioRef: Ref.DefinitionRef,
-      speedyMachine: Speedy.Machine): L.Ledger = {
+      speedyMachine: Speedy.Machine,
+  ): L.Ledger = {
     ScenarioRunner(speedyMachine).run match {
       case Left(e) =>
         throw new RuntimeException(s"error running scenario $scenarioRef in scenario $e")
@@ -138,9 +147,11 @@ object ScenarioLoader {
   private def getSpeedyMachine(
       submissionVersion: LanguageVersion,
       scenarioExpr: Ast.Expr,
-      compiledPackages: CompiledPackages): Speedy.Machine = {
+      compiledPackages: CompiledPackages,
+  ): Speedy.Machine = {
     Speedy.Machine.newBuilder(compiledPackages) match {
-      case Left(err) => throw new RuntimeException(s"Could not build speedy machine: $err")
+      case Left(err) =>
+        throw new RuntimeException(s"Could not build speedy machine: $err")
       case Right(build) =>
         build(VersionTimeline.checkSubmitterInMaintainers(submissionVersion), scenarioExpr)
     }
@@ -151,32 +162,36 @@ object ScenarioLoader {
       case DValue(_, _, body, _) => body
       case _: DTypeSyn =>
         throw new RuntimeException(
-          s"Requested scenario $scenarioRef is a type synonym, not a definition")
+          s"Requested scenario $scenarioRef is a type synonym, not a definition",
+        )
       case _: DDataType =>
         throw new RuntimeException(
-          s"Requested scenario $scenarioRef is a data type, not a definition")
+          s"Requested scenario $scenarioRef is a data type, not a definition",
+        )
     }
   }
 
   private def identifyScenario(
       packages: InMemoryPackageStore,
       scenario: String,
-      candidateScenarios: List[(Ref.DefinitionRef, LanguageVersion, Definition)])
-    : (Ref.DefinitionRef, LanguageVersion, Definition) = {
+      candidateScenarios: List[(Ref.DefinitionRef, LanguageVersion, Definition)],
+  ): (Ref.DefinitionRef, LanguageVersion, Definition) = {
     candidateScenarios match {
       case Nil =>
         throw new RuntimeException(
-          s"Couldn't find scenario $scenario in packages ${packages.listLfPackagesSync().keys.toList}")
+          s"Couldn't find scenario $scenario in packages ${packages.listLfPackagesSync().keys.toList}",
+        )
       case candidate :: Nil => candidate
       case candidates =>
         throw new RuntimeException(
-          s"Requested scenario $scenario is present in multiple packages: ${candidates.map(_._1.packageId).toString}")
+          s"Requested scenario $scenario is present in multiple packages: ${candidates.map(_._1.packageId).toString}",
+        )
     }
   }
 
   private def getCandidateScenarios(
       packages: InMemoryPackageStore,
-      scenarioQualName: Ref.QualifiedName
+      scenarioQualName: Ref.QualifiedName,
   ): List[(Ref.Identifier, LanguageVersion, Definition)] = {
     packages
       .listLfPackagesSync()
@@ -191,7 +206,9 @@ object ScenarioLoader {
                 (
                   Ref.Identifier(packageId, scenarioQualName),
                   pkg.modules(scenarioQualName.module).languageVersion,
-                  x))
+                  x,
+                ),
+              )
             case Left(_) => List()
           }
       }(breakOut)
@@ -199,20 +216,23 @@ object ScenarioLoader {
 
   private def getScenarioQualifiedName(
       packages: InMemoryPackageStore,
-      scenario: String
+      scenario: String,
   ): Ref.QualifiedName = {
     Ref.QualifiedName.fromString(scenario) match {
       case Left(_) =>
         throw new RuntimeException(
-          s"Cannot find scenario $scenario in packages ${packages.listLfPackagesSync().keys.mkString("[", ", ", "]")}.")
+          s"Cannot find scenario $scenario in packages ${packages.listLfPackagesSync().keys.mkString("[", ", ", "]")}.",
+        )
       case Right(x) => x
     }
   }
 
   private val transactionIdPrefix =
     Ref.TransactionIdString.assertFromString(s"scenario-transaction-")
-  private val workflowIdPrefix = Ref.LedgerString.assertFromString(s"scenario-workflow-")
-  private val scenarioLoader = Ref.LedgerString.assertFromString("scenario-loader")
+  private val workflowIdPrefix =
+    Ref.LedgerString.assertFromString(s"scenario-workflow-")
+  private val scenarioLoader =
+    Ref.LedgerString.assertFromString("scenario-loader")
 
   private def executeScenarioStep(
       ledger: ArrayBuffer[(ScenarioTransactionId, LedgerEntry)],
@@ -221,7 +241,7 @@ object ScenarioLoader {
       time: Time.Timestamp,
       mbOldTxId: Option[ScenarioTransactionId],
       stepId: Int,
-      step: L.ScenarioStep
+      step: L.ScenarioStep,
   ): (InMemoryActiveLedgerState, Time.Timestamp, Option[ScenarioTransactionId]) = {
     step match {
       case L.Commit(txId: ScenarioTransactionId, richTransaction: L.RichTransaction, _) =>
@@ -230,26 +250,30 @@ object ScenarioLoader {
           case Some(oldTxId) =>
             if (oldTxId >= txId) {
               throw new RuntimeException(
-                s"Non-monotonic transaction ids in ledger results: got $oldTxId first and then $txId")
+                s"Non-monotonic transaction ids in ledger results: got $oldTxId first and then $txId",
+              )
             }
         }
 
         val transactionId = txId.id
         val workflowId =
           Some(Ref.LedgerString.concat(workflowIdPrefix, Ref.LedgerString.fromInt(stepId)))
-        val txNoHash = GenTransaction(richTransaction.nodes, richTransaction.roots, None)
+        val txNoHash =
+          GenTransaction(richTransaction.nodes, richTransaction.roots, None)
         val tx = txNoHash
           .mapContractIdAndValue(absCidWithHash, _.mapContractId(absCidWithHash))
           .mapNodeId(nodeIdWithHash)
         val mappedExplicitDisclosure = richTransaction.explicitDisclosure.map {
           case (nid, parties) => nodeIdWithHash(nid) -> parties
         }
-        val mappedLocalImplicitDisclosure = richTransaction.localImplicitDisclosure.map {
-          case (nid, parties) => nodeIdWithHash(nid) -> parties
-        }
-        val mappedGlobalImplicitDisclosure = richTransaction.globalImplicitDisclosure.map {
-          case (k, v) => absCidWithHash(k) -> v
-        }
+        val mappedLocalImplicitDisclosure =
+          richTransaction.localImplicitDisclosure.map {
+            case (nid, parties) => nodeIdWithHash(nid) -> parties
+          }
+        val mappedGlobalImplicitDisclosure =
+          richTransaction.globalImplicitDisclosure.map {
+            case (k, v) => absCidWithHash(k) -> v
+          }
         // copies non-absolute-able node IDs, but IDs that don't match
         // get intersected away later
         acs.addTransaction(
@@ -261,7 +285,7 @@ object ScenarioLoader {
           mappedExplicitDisclosure,
           mappedLocalImplicitDisclosure,
           mappedGlobalImplicitDisclosure,
-          List.empty
+          List.empty,
         ) match {
           case Right(newAcs) =>
             ledger +=
@@ -277,8 +301,10 @@ object ScenarioLoader {
                     time.toInstant,
                     time.toInstant,
                     tx,
-                    mappedExplicitDisclosure
-                  )))
+                    mappedExplicitDisclosure,
+                  ),
+                ),
+              )
             (newAcs, time, Some(txId))
           case Left(err) =>
             throw new RuntimeException(s"Error when augmenting acs at step $stepId: $err")
@@ -290,13 +316,19 @@ object ScenarioLoader {
     }
   }
 
-  private val `#` = Ref.ContractIdString.assertFromString("#")
+  private val `#` = Ref.ContractIdStringV0.assertFromString("#")
   // currently the scenario interpreter produces the contract ids with no hash prefix,
   // but the sandbox does. add them here too for consistency
   private def absCidWithHash(a: AbsoluteContractId): AbsoluteContractId =
-    AbsoluteContractId(Ref.ContractIdString.concat(`#`, a.coid))
+    Ref.ContractIdStringV0
+      .fromString(a.coid)
+      .fold(
+        _ => a,
+        coid =>
+          AbsoluteContractId(Ref.ContractIdString.fromV0(Ref.ContractIdStringV0.concat(`#`, coid))),
+      )
 
   private def nodeIdWithHash(nid: L.ScenarioNodeId): com.digitalasset.ledger.EventId =
-    Ref.ContractIdString.concat(`#`, nid)
+    Ref.LedgerString.concat(`#`, nid)
 
 }

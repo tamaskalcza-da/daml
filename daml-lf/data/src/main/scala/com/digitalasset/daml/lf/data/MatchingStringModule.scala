@@ -28,21 +28,28 @@ sealed abstract class StringModule {
   final def toStringMap[V](map: Map[T, V]): Map[String, V] = map.toMap
 }
 
+private sealed trait StringModuleImpl {
+  type T = String
+
+  def equalInstance: Equal[T] = scalaz.std.string.stringInstance
+
+  val Array: ArrayFactory[T] = new ArrayFactory[T]
+}
+
 object MatchingStringModule extends (String => StringModule) {
 
-  override def apply(string_regex: String): StringModule = new StringModule {
-    type T = String
+  override def apply(string_regex: String): StringModule =
+    new StringModule with StringModuleImpl {
+      private val regex = string_regex.r
+      private val pattern = regex.pattern
 
-    private val regex = string_regex.r
-    private val pattern = regex.pattern
-
-    override def fromString(s: String): Either[String, T] =
-      Either.cond(pattern.matcher(s).matches(), s, s"""string "$s" does not match regex "$regex"""")
-
-    override def equalInstance: Equal[T] = scalaz.std.string.stringInstance
-
-    override val Array: ArrayFactory[T] = new ArrayFactory[T]
-  }
+      override def fromString(s: String): Either[String, T] =
+        Either.cond(
+          pattern.matcher(s).matches(),
+          s,
+          s"""string "$s" does not match regex "$regex"""",
+        )
+    }
 
 }
 
@@ -70,32 +77,63 @@ object ConcatenableMatchingStringModule
 
   override def apply(
       extraAllowedChars: Char => Boolean,
-      maxLength: Int = Int.MaxValue
-  ): ConcatenableStringModule = new ConcatenableStringModule {
-    type T = String
+      maxLength: Int = Int.MaxValue,
+  ): ConcatenableStringModule =
+    new ConcatenableStringModule with StringModuleImpl {
 
-    override def fromString(s: String): Either[String, T] =
-      if (s.isEmpty)
-        Left(s"""empty string""")
-      else if (s.length > maxLength)
-        Left(s"""string too long""")
-      else
-        s.find(c => c > 0x7f || !(c.isLetterOrDigit || extraAllowedChars(c)))
-          .fold[Either[String, T]](Right(s))(c =>
-            Left(s"""non expected character 0x${c.toInt.toHexString} in "$s""""))
+      override def fromString(s: String): Either[String, T] =
+        if (s.isEmpty)
+          Left(s"""empty string""")
+        else if (s.length > maxLength)
+          Left(s"""string too long""")
+        else
+          s.find(c => c > 0x7f || !(c.isLetterOrDigit || extraAllowedChars(c)))
+            .fold[Either[String, T]](Right(s))(c =>
+              Left(s"""non expected character 0x${c.toInt.toHexString} in "$s""""),
+            )
 
-    override def fromLong(i: Long): T = i.toString
+      override def fromLong(i: Long): T = i.toString
 
-    override def equalInstance: Equal[T] = scalaz.std.string.stringInstance
-
-    override val Array: ArrayFactory[T] = new ArrayFactory[T]
-
-    override def concat(s: T, ss: T*): T = {
-      val b = StringBuilder.newBuilder
-      b ++= s
-      ss.foreach(b ++= _)
-      b.result()
+      override def concat(s: T, ss: T*): T = {
+        val b = StringBuilder.newBuilder
+        b ++= s
+        ss.foreach(b ++= _)
+        b.result()
+      }
     }
-  }
+
+}
+
+sealed abstract class ContractIdStringModule[CidV0 <: String, CidV1 <: String]
+    extends StringModule {
+  def fromV0(s: CidV0): T
+  def fromV1(s: CidV1): T
+
+  val fromStringToV0: String => Either[String, T]
+  val fromStringToV1: String => Either[String, T]
+  val prefixV1: String
+
+  override final def fromString(s: String): Either[String, T] =
+    if (s.startsWith(prefixV1))
+      fromStringToV1(s)
+    else
+      fromStringToV0(s)
+
+}
+
+object ContractIdStringModule {
+
+  def apply[CidV0 <: String, CidV1 <: String](
+      fromStringToV0_ : String => Either[String, CidV0],
+      fromStringToV1_ : String => Either[String, CidV1],
+      prefixV1_ : String,
+  ): ContractIdStringModule[CidV0, CidV1] =
+    new ContractIdStringModule[CidV0, CidV1] with StringModuleImpl {
+      override val fromStringToV0: String => Either[String, T] = fromStringToV0_
+      override val fromStringToV1: String => Either[String, T] = fromStringToV1_
+      override val prefixV1: String = prefixV1_
+      override def fromV0(s: CidV0): T = s
+      override def fromV1(s: CidV1): T = s
+    }
 
 }

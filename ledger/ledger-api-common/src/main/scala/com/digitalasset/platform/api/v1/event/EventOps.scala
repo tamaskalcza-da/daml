@@ -10,7 +10,7 @@ import com.digitalasset.ledger.api.v1.event.{CreatedEvent, Event, ExercisedEvent
 import com.digitalasset.ledger.api.v1.transaction.TreeEvent
 import com.digitalasset.ledger.api.v1.transaction.TreeEvent.Kind.{
   Created => TreeCreated,
-  Exercised => TreeExercised
+  Exercised => TreeExercised,
 }
 import scalaz.Tag
 
@@ -26,16 +26,20 @@ object EventOps {
 
     def templateId: String = event.event.templateId
 
-    def withWitnesses(witnesses: Seq[String]): Event = Event(event.event.withWitnesses(witnesses))
+    def withWitnesses(witnesses: Seq[String]): Event =
+      Event(event.event.withWitnesses(witnesses))
 
   }
 
   implicit class EventEventOps(val event: Event.Event) extends AnyVal {
 
     def eventId: EventId = event match {
-      case Archived(value) => EventId(Ref.LedgerString.assertFromString(value.eventId))
-      case Created(value) => EventId(Ref.LedgerString.assertFromString(value.eventId))
-      case Empty => throw new IllegalArgumentException("Cannot extract Event ID from Empty event.")
+      case Archived(value) =>
+        EventId(Ref.LedgerString.assertFromString(value.eventId))
+      case Created(value) =>
+        EventId(Ref.LedgerString.assertFromString(value.eventId))
+      case Empty =>
+        throw new IllegalArgumentException("Cannot extract Event ID from Empty event.")
     }
 
     def witnesses: Seq[String] = event match {
@@ -58,7 +62,7 @@ object EventOps {
         case Empty =>
           throw new IllegalArgumentException("Cannot extract contractId from Empty event.")
       }
-      ContractId(Ref.LedgerString.assertFromString(rawId))
+      ContractId(Ref.ContractIdString.assertFromString(rawId))
     }
 
     def withWitnesses(witnesses: Seq[String]): Event.Event = event match {
@@ -74,7 +78,8 @@ object EventOps {
       kind match {
         case e: TreeExercised => exerciseHandler(e.value)
         case c: TreeCreated => createHandler(c.value)
-        case tk => throw new IllegalArgumentException(s"Unknown TreeEvent type: $tk")
+        case tk =>
+          throw new IllegalArgumentException(s"Unknown TreeEvent type: $tk")
       }
   }
 
@@ -82,11 +87,13 @@ object EventOps {
     def eventId: EventId =
       event.kind.fold(
         e => EventId(Ref.LedgerString.assertFromString(e.eventId)),
-        c => EventId(Ref.LedgerString.assertFromString(c.eventId)))
+        c => EventId(Ref.LedgerString.assertFromString(c.eventId)),
+      )
     def children: Seq[EventId] =
       event.kind
         .fold(e => Tag.subst(e.childEventIds.map(Ref.LedgerString.assertFromString)), _ => Nil)
-    def witnessParties: Seq[String] = event.kind.fold(_.witnessParties, _.witnessParties)
+    def witnessParties: Seq[String] =
+      event.kind.fold(_.witnessParties, _.witnessParties)
   }
 
 }

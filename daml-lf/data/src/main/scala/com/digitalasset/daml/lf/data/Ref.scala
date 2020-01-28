@@ -1,7 +1,8 @@
 // Copyright (c) 2020 The DAML Authors. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.digitalasset.daml.lf.data
+package com.digitalasset.daml.lf
+package data
 
 import com.digitalasset.daml.lf.data
 import scalaz.Equal
@@ -14,7 +15,8 @@ object Ref {
       module: ModuleName,
       definition: String,
       start: (Int, Int),
-      end: (Int, Int))
+      end: (Int, Int),
+  )
 
   // we do not use String.split because `":foo".split(":")`
   // results in `List("foo")` rather than `List("", "foo")`
@@ -65,7 +67,8 @@ object Ref {
       import scala.math.Ordering.Implicits._
       import Name.ordering
 
-      implicitly[Ordering[Seq[Name]]].compare(segments.toSeq, that.segments.toSeq)
+      implicitly[Ordering[Seq[Name]]]
+        .compare(segments.toSeq, that.segments.toSeq)
     }
 
   }
@@ -89,7 +92,8 @@ object Ref {
         for {
           stack <- acc
           segment <- Name.fromString(string)
-        } yield stack :+ segment)
+        } yield stack :+ segment,
+      )
       for {
         segments <- validatedSegments
         name <- fromNames(segments.toImmArray)
@@ -184,11 +188,23 @@ object Ref {
     * construct some by concatenating the others.
     */
   // We allow space because the navigator's applicationId used it.
-  val LedgerString = ConcatenableMatchingStringModule("._:-#/ ".contains(_), 255)
+  val LedgerString =
+    ConcatenableMatchingStringModule("._:-#/ ".contains(_), 255)
   type LedgerString = LedgerString.T
 
-  /** Identifier for a contractId */
-  val ContractIdString: LedgerString.type = LedgerString
+  val ContractIdStringV0: LedgerString.type = LedgerString
+  type ContractIdStringV0 = LedgerString.T
+
+  val ContractIdStringV1 =
+    MatchingStringModule("""\$01[0-9a-f]{64}[A-Za-z0-9:-_]*""")
+  type ContractIdStringV1 = ContractIdStringV1.T
+
+  val ContractIdString: ContractIdStringModule[ContractIdStringV0, ContractIdStringV1] =
+    ContractIdStringModule(
+      ContractIdStringV0.fromString,
+      ContractIdStringV1.fromString,
+      "$01",
+    )
   type ContractIdString = ContractIdString.T
 
   /** Identifiers for transactions. */

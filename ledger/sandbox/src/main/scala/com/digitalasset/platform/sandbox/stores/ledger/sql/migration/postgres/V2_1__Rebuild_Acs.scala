@@ -31,7 +31,7 @@ import com.digitalasset.platform.sandbox.stores.ledger.sql.serialisation.{
   ContractSerializer,
   KeyHasher,
   TransactionSerializer,
-  ValueSerializer
+  ValueSerializer,
 }
 import com.digitalasset.platform.sandbox.stores.ledger.sql.util.Conversions._
 import org.flywaydb.core.api.migration.{BaseJavaMigration, Context}
@@ -67,13 +67,15 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
       .as(SqlParser.long("ledger_end").singleOpt)
 
   private val SQL_INITIALIZE = SQL(
-    "insert into parameters(ledger_id, ledger_end) VALUES({LedgerId}, {LedgerEnd})")
+    "insert into parameters(ledger_id, ledger_end) VALUES({LedgerId}, {LedgerEnd})",
+  )
 
   // Note that the ledger entries grow monotonically, however we store many ledger entries in parallel,
   // and thus we need to make sure to only update the ledger end when the ledger entry we're committing
   // is advancing it.
   private val SQL_UPDATE_LEDGER_END = SQL(
-    "update parameters set ledger_end = {LedgerEnd} where ledger_end < {LedgerEnd}")
+    "update parameters set ledger_end = {LedgerEnd} where ledger_end < {LedgerEnd}",
+  )
 
   private def updateLedgerEnd(ledgerEnd: Long)(implicit conn: Connection): Unit = {
     SQL_UPDATE_LEDGER_END
@@ -84,54 +86,62 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
 
   private val SQL_INSERT_CONTRACT_KEY =
     SQL(
-      "insert into contract_keys(package_id, name, value_hash, contract_id) values({package_id}, {name}, {value_hash}, {contract_id})")
+      "insert into contract_keys(package_id, name, value_hash, contract_id) values({package_id}, {name}, {value_hash}, {contract_id})",
+    )
 
   private val SQL_SELECT_CONTRACT_KEY =
     SQL(
-      "select contract_id from contract_keys where package_id={package_id} and name={name} and value_hash={value_hash}")
+      "select contract_id from contract_keys where package_id={package_id} and name={name} and value_hash={value_hash}",
+    )
 
   private val SQL_REMOVE_CONTRACT_KEY =
     SQL("delete from contract_keys where contract_id={contract_id}")
 
   private[this] def storeContractKey(key: GlobalKey, cid: AbsoluteContractId)(
-      implicit connection: Connection): Boolean =
+      implicit connection: Connection,
+  ): Boolean =
     SQL_INSERT_CONTRACT_KEY
       .on(
         "package_id" -> key.templateId.packageId,
         "name" -> key.templateId.qualifiedName.toString,
         "value_hash" -> keyHasher.hashKeyString(key),
-        "contract_id" -> cid.coid
+        "contract_id" -> cid.coid,
       )
       .execute()
 
-  private[this] def removeContractKey(cid: AbsoluteContractId)(
-      implicit connection: Connection): Boolean =
+  private[this] def removeContractKey(
+      cid: AbsoluteContractId,
+  )(implicit connection: Connection): Boolean =
     SQL_REMOVE_CONTRACT_KEY
       .on(
         "contract_id" -> cid.coid,
       )
       .execute()
 
-  private[this] def selectContractKey(key: GlobalKey)(
-      implicit connection: Connection): Option[AbsoluteContractId] =
+  private[this] def selectContractKey(
+      key: GlobalKey,
+  )(implicit connection: Connection): Option[AbsoluteContractId] =
     SQL_SELECT_CONTRACT_KEY
       .on(
         "package_id" -> key.templateId.packageId,
         "name" -> key.templateId.qualifiedName.toString,
-        "value_hash" -> keyHasher.hashKeyString(key)
+        "value_hash" -> keyHasher.hashKeyString(key),
       )
-      .as(ledgerString("contract_id").singleOpt)
+      .as(contractIdString("contract_id").singleOpt)
       .map(AbsoluteContractId)
 
   private def storeContract(offset: Long, contract: ActiveContract)(
-      implicit connection: Connection): Unit = storeContracts(offset, List(contract))
+      implicit connection: Connection,
+  ): Unit =
+    storeContracts(offset, List(contract))
 
   private def archiveContract(offset: Long, cid: AbsoluteContractId)(
-      implicit connection: Connection): Boolean =
+      implicit connection: Connection,
+  ): Boolean =
     SQL_ARCHIVE_CONTRACT
       .on(
         "id" -> cid.coid,
-        "archive_offset" -> offset
+        "archive_offset" -> offset,
       )
       .execute()
 
@@ -146,7 +156,8 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
     "insert into contract_key_maintainers(contract_id, maintainer) values({contract_id}, {maintainer})"
 
   private def storeContracts(offset: Long, contracts: immutable.Seq[ActiveContract])(
-      implicit connection: Connection): Unit = {
+      implicit connection: Connection,
+  ): Unit = {
 
     // A ACS contract contaixns several collections (e.g., witnesses or divulgences).
     // The contract is therefore stored in several SQL tables.
@@ -154,50 +165,49 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
     // Part 1: insert the contract data into the 'contracts' table
     if (contracts.nonEmpty) {
       val namedContractParams = contracts
-        .map(
-          c =>
-            Seq[NamedParameter](
-              "id" -> c.id.coid,
-              "transaction_id" -> c.transactionId,
-              "workflow_id" -> c.workflowId.getOrElse(""),
-              "package_id" -> c.contract.template.packageId,
-              "name" -> c.contract.template.qualifiedName.toString,
-              "create_offset" -> offset,
-              "contract" -> contractSerializer
-                .serializeContractInstance(c.contract)
-                .getOrElse(sys.error(s"failed to serialize contract! cid:${c.id.coid}")),
-              "key" -> c.key
-                .map(
-                  k =>
-                    valueSerializer
-                      .serializeValue(k.key)
-                      .getOrElse(
-                        sys.error(s"failed to serialize contract key value! cid:${c.id.coid}")))
-          )
+        .map(c =>
+          Seq[NamedParameter](
+            "id" -> c.id.coid,
+            "transaction_id" -> c.transactionId,
+            "workflow_id" -> c.workflowId.getOrElse(""),
+            "package_id" -> c.contract.template.packageId,
+            "name" -> c.contract.template.qualifiedName.toString,
+            "create_offset" -> offset,
+            "contract" -> contractSerializer
+              .serializeContractInstance(c.contract)
+              .getOrElse(sys.error(s"failed to serialize contract! cid:${c.id.coid}")),
+            "key" -> c.key
+              .map(k =>
+                valueSerializer
+                  .serializeValue(k.key)
+                  .getOrElse(
+                    sys.error(s"failed to serialize contract key value! cid:${c.id.coid}"),
+                  ),
+              ),
+          ),
         )
 
       executeBatchSql(
         SQL_INSERT_CONTRACT,
-        namedContractParams
+        namedContractParams,
       )
 
       // Part 2: insert witnesses into the 'contract_witnesses' table
       val namedWitnessesParams = contracts
-        .flatMap(
-          c =>
-            c.witnesses.map(
-              w =>
-                Seq[NamedParameter](
-                  "contract_id" -> c.id.coid,
-                  "witness" -> w
-              ))
+        .flatMap(c =>
+          c.witnesses.map(w =>
+            Seq[NamedParameter](
+              "contract_id" -> c.id.coid,
+              "witness" -> w,
+            ),
+          ),
         )
         .toArray
 
       if (!namedWitnessesParams.isEmpty) {
         executeBatchSql(
           SQL_INSERT_CONTRACT_WITNESS,
-          namedWitnessesParams
+          namedWitnessesParams,
         )
       }
 
@@ -210,68 +220,65 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
         // Since we only have the transaction IDs when the contract was divulged, we need to look up the corresponding
         // ledger offsets.
         val namedDivulgenceParams = contracts
-          .flatMap(
-            c =>
-              c.divulgences.map(
-                w =>
-                  Seq[NamedParameter](
-                    "contract_id" -> c.id.coid,
-                    "party" -> (w._1: String),
-                    "transaction_id" -> w._2
-                ))
+          .flatMap(c =>
+            c.divulgences.map(w =>
+              Seq[NamedParameter](
+                "contract_id" -> c.id.coid,
+                "party" -> (w._1: String),
+                "transaction_id" -> w._2,
+              ),
+            ),
           )
           .toArray
 
         if (!namedDivulgenceParams.isEmpty) {
           executeBatchSql(
             SQL_BATCH_INSERT_DIVULGENCES_FROM_TRANSACTION_ID,
-            namedDivulgenceParams
+            namedDivulgenceParams,
           )
         }
       } else {
         val namedDivulgenceParams = contracts
-          .flatMap(
-            c =>
-              c.divulgences.map(
-                w =>
-                  Seq[NamedParameter](
-                    "contract_id" -> c.id.coid,
-                    "party" -> (w._1: String),
-                    "ledger_offset" -> offset,
-                    "transaction_id" -> c.transactionId
-                ))
+          .flatMap(c =>
+            c.divulgences.map(w =>
+              Seq[NamedParameter](
+                "contract_id" -> c.id.coid,
+                "party" -> (w._1: String),
+                "ledger_offset" -> offset,
+                "transaction_id" -> c.transactionId,
+              ),
+            ),
           )
           .toArray
 
         if (!namedDivulgenceParams.isEmpty) {
           executeBatchSql(
             SQL_BATCH_INSERT_DIVULGENCES,
-            namedDivulgenceParams
+            namedDivulgenceParams,
           )
         }
       }
 
       // Part 4: insert key maintainers into the 'contract_key_maintainers' table
       val namedKeyMaintainerParams = contracts
-        .flatMap(
-          c =>
-            c.key
-              .map(
-                k =>
-                  k.maintainers.map(
-                    p =>
-                      Seq[NamedParameter](
-                        "contract_id" -> c.id.coid,
-                        "maintainer" -> p
-                    )))
-              .getOrElse(Set.empty)
+        .flatMap(c =>
+          c.key
+            .map(k =>
+              k.maintainers.map(p =>
+                Seq[NamedParameter](
+                  "contract_id" -> c.id.coid,
+                  "maintainer" -> p,
+                ),
+              ),
+            )
+            .getOrElse(Set.empty),
         )
         .toArray
 
       if (!namedKeyMaintainerParams.isEmpty) {
         executeBatchSql(
           SQL_INSERT_CONTRACT_KEY_MAINTAINERS,
-          namedKeyMaintainerParams
+          namedKeyMaintainerParams,
         )
       }
     }
@@ -284,12 +291,14 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
   private val SQL_INSERT_TRANSACTION =
     SQL(
       """insert into ledger_entries(typ, ledger_offset, transaction_id, command_id, application_id, submitter, workflow_id, effective_at, recorded_at, transaction)
-        |values('transaction', {ledger_offset}, {transaction_id}, {command_id}, {application_id}, {submitter}, {workflow_id}, {effective_at}, {recorded_at}, {transaction})""".stripMargin)
+        |values('transaction', {ledger_offset}, {transaction_id}, {command_id}, {application_id}, {submitter}, {workflow_id}, {effective_at}, {recorded_at}, {transaction})""".stripMargin,
+    )
 
   private val SQL_INSERT_REJECTION =
     SQL(
       """insert into ledger_entries(typ, ledger_offset, command_id, application_id, submitter, recorded_at, rejection_type, rejection_description)
-        |values('rejection', {ledger_offset}, {command_id}, {application_id}, {submitter}, {recorded_at}, {rejection_type}, {rejection_description})""".stripMargin)
+        |values('rejection', {ledger_offset}, {command_id}, {application_id}, {submitter}, {recorded_at}, {rejection_type}, {rejection_description})""".stripMargin,
+    )
 
   private val SQL_BATCH_INSERT_DISCLOSURES =
     "insert into disclosures(transaction_id, event_id, party) values({transaction_id}, {event_id}, {party})"
@@ -315,7 +324,8 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
 
   private val SQL_INSERT_CHECKPOINT =
     SQL(
-      "insert into ledger_entries(typ, ledger_offset, recorded_at) values('checkpoint', {ledger_offset}, {recorded_at})")
+      "insert into ledger_entries(typ, ledger_offset, recorded_at) values('checkpoint', {ledger_offset}, {recorded_at})",
+    )
 
   /**
     * Updates the active contract set from the given DAML transaction.
@@ -326,8 +336,8 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
       offset: Long,
       tx: LedgerEntry.Transaction,
       localDivulgence: Relation[EventId, Party],
-      globalDivulgence: Relation[AbsoluteContractId, Party])(
-      implicit connection: Connection): Unit = tx match {
+      globalDivulgence: Relation[AbsoluteContractId, Party],
+  )(implicit connection: Connection): Unit = tx match {
     case LedgerEntry.Transaction(
         _,
         transactionId,
@@ -337,7 +347,8 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
         ledgerEffectiveTime,
         _,
         transaction,
-        explicitDisclosure) =>
+        explicitDisclosure,
+        ) =>
       val mappedDisclosure = explicitDisclosure
         .mapValues(parties => parties.map(Party.assertFromString))
 
@@ -369,18 +380,19 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
         override def divulgeAlreadyCommittedContracts(
             transactionId: TransactionIdString,
             global: Relation[AbsoluteContractId, Party],
-            referencedContracts: List[(Value.AbsoluteContractId, AbsoluteContractInst)]) = {
+            referencedContracts: List[(Value.AbsoluteContractId, AbsoluteContractInst)],
+        ) = {
           val divulgenceParams = global
             .flatMap {
               case (cid, parties) =>
-                parties.map(
-                  p =>
-                    Seq[NamedParameter](
-                      "contract_id" -> cid.coid,
-                      "party" -> p,
-                      "ledger_offset" -> offset,
-                      "transaction_id" -> transactionId
-                  ))
+                parties.map(p =>
+                  Seq[NamedParameter](
+                    "contract_id" -> cid.coid,
+                    "party" -> p,
+                    "ledger_offset" -> offset,
+                    "transaction_id" -> transactionId,
+                  ),
+                )
             }
           // Note: the in-memory ledger only stores divulgence for contracts in the ACS.
           // Do we need here the equivalent to 'contracts.intersectWith(global)', used in the in-memory
@@ -406,7 +418,7 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
         mappedDisclosure,
         localDivulgence,
         globalDivulgence,
-        List.empty
+        List.empty,
       )
 
       atr match {
@@ -418,14 +430,16 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
                |If this is the case, you will need to manually fix the transaction history and then retry.
                |Details: ${errs.map(_.toString).mkString(", ")}.
                |Aborting migration.
-             """.stripMargin)
+             """.stripMargin,
+          )
         case Right(_) =>
           ()
       }
   }
 
   private def storeTransaction(offset: Long, tx: LedgerEntry.Transaction)(
-      implicit connection: Connection): Unit = {
+      implicit connection: Connection,
+  ): Unit = {
     SQL_INSERT_TRANSACTION
       .on(
         "ledger_offset" -> offset,
@@ -438,24 +452,24 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
         "recorded_at" -> tx.recordedAt,
         "transaction" -> transactionSerializer
           .serializeTransaction(tx.transaction)
-          .getOrElse(sys.error(s"failed to serialize transaction! trId: ${tx.transactionId}"))
+          .getOrElse(sys.error(s"failed to serialize transaction! trId: ${tx.transactionId}")),
       )
       .execute()
 
     val disclosureParams = tx.explicitDisclosure.flatMap {
       case (eventId, parties) =>
-        parties.map(
-          p =>
-            Seq[NamedParameter](
-              "transaction_id" -> tx.transactionId,
-              "event_id" -> eventId,
-              "party" -> p
-          ))
+        parties.map(p =>
+          Seq[NamedParameter](
+            "transaction_id" -> tx.transactionId,
+            "event_id" -> eventId,
+            "party" -> p,
+          ),
+        )
     }
     if (disclosureParams.nonEmpty) {
       executeBatchSql(
         SQL_BATCH_INSERT_DISCLOSURES,
-        disclosureParams
+        disclosureParams,
       )
     }
 
@@ -463,7 +477,8 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
   }
 
   private def storeCheckpoint(offset: Long, checkpoint: LedgerEntry.Checkpoint)(
-      implicit connection: Connection): Unit = {
+      implicit connection: Connection,
+  ): Unit = {
     SQL_INSERT_CHECKPOINT
       .on("ledger_offset" -> offset, "recorded_at" -> checkpoint.recordedAt)
       .execute()
@@ -498,7 +513,8 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
       transaction: Option[Array[Byte]],
       rejectionType: Option[String],
       rejectionDesc: Option[String],
-      offset: Long)
+      offset: Long,
+  )
 
   private val EntryParser: RowParser[ParsedEntry] =
     Macro.parser[ParsedEntry](
@@ -513,13 +529,14 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
       "transaction",
       "rejection_type",
       "rejection_description",
-      "ledger_offset"
+      "ledger_offset",
     )
 
   private val DisclosureParser = (ledgerString("event_id") ~ party("party") map (flatten))
 
-  private def toLedgerEntry(parsedEntry: ParsedEntry)(
-      implicit conn: Connection): (Long, LedgerEntry) = parsedEntry match {
+  private def toLedgerEntry(
+      parsedEntry: ParsedEntry,
+  )(implicit conn: Connection): (Long, LedgerEntry) = parsedEntry match {
     case ParsedEntry(
         "transaction",
         Some(transactionId),
@@ -532,7 +549,8 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
         Some(transactionStream),
         None,
         None,
-        offset) =>
+        offset,
+        ) =>
       val disclosure = SQL_SELECT_DISCLOSURE
         .on("transaction_id" -> transactionId)
         .as(DisclosureParser.*)
@@ -550,7 +568,7 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
         transactionSerializer
           .deserializeTransaction(transactionStream)
           .getOrElse(sys.error(s"failed to deserialize transaction! trId: $transactionId")),
-        disclosure
+        disclosure,
       )
     case ParsedEntry(
         "rejection",
@@ -564,8 +582,10 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
         None,
         Some(rejectionType),
         Some(rejectionDescription),
-        offset) =>
-      val rejectionReason = readRejectionReason(rejectionType, rejectionDescription)
+        offset,
+        ) =>
+      val rejectionReason =
+        readRejectionReason(rejectionType, rejectionDescription)
       offset -> LedgerEntry
         .Rejection(recordedAt.toInstant, commandId, applicationId, submitter, rejectionReason)
     case ParsedEntry(
@@ -580,7 +600,8 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
         None,
         None,
         None,
-        offset) =>
+        offset,
+        ) =>
       offset -> LedgerEntry.Checkpoint(recordedAt.toInstant)
     case invalidRow =>
       sys.error(s"invalid ledger entry for offset: ${invalidRow.offset}. database row: $invalidRow")
@@ -603,7 +624,8 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
 
   private val SQL_SELECT_CONTRACT_LET =
     SQL(
-      "select c.*, le.recorded_at, le.transaction from contracts c inner join ledger_entries le on c.transaction_id = le.transaction_id where id={contract_id} and archive_offset is null ")
+      "select c.*, le.recorded_at, le.transaction from contracts c inner join ledger_entries le on c.transaction_id = le.transaction_id where id={contract_id} and archive_offset is null ",
+    )
 
   private val SQL_SELECT_WITNESS =
     SQL("select witness from contract_witnesses where contract_id={contract_id}")
@@ -614,7 +636,8 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
 
   private val SQL_SELECT_DIVULGENCE =
     SQL(
-      "select party, ledger_offset, transaction_id from contract_divulgences where contract_id={contract_id}")
+      "select party, ledger_offset, transaction_id from contract_divulgences where contract_id={contract_id}",
+    )
 
   private val SQL_SELECT_KEY_MAINTAINERS =
     SQL("select maintainer from contract_key_maintainers where contract_id={contract_id}")
@@ -622,8 +645,9 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
   /** Note: at the time this migration was written, divulged contracts were not stored separately from active contracts.
     * This method therefore treats all contracts as active contracts.
     */
-  private def lookupActiveContractLetSync(contractId: AbsoluteContractId)(
-      implicit conn: Connection): Option[LetLookup] =
+  private def lookupActiveContractLetSync(
+      contractId: AbsoluteContractId,
+  )(implicit conn: Connection): Option[LetLookup] =
     SQL_SELECT_CONTRACT_LET
       .on("contract_id" -> contractId.coid)
       .as(ContractDataParser.singleOpt)
@@ -632,7 +656,8 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
       }
 
   private val SQL_GET_LEDGER_ENTRIES = SQL(
-    "select * from ledger_entries where ledger_offset>={startInclusive} and ledger_offset<{endExclusive} order by ledger_offset asc")
+    "select * from ledger_entries where ledger_offset>={startInclusive} and ledger_offset<{endExclusive} order by ledger_offset asc",
+  )
 
   // Note that here we are reading, non transactionally, the stream in chunks. The reason why this is
   // safe is that
@@ -642,7 +667,8 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
       startInclusive: Long,
       endExclusive: Long,
       pageSize: Int,
-      queryPage: (Long, Long) => Source[T, NotUsed]): Source[T, NotUsed] =
+      queryPage: (Long, Long) => Source[T, NotUsed],
+  ): Source[T, NotUsed] =
     Source
       .lazySource[T, NotUsed] { () =>
         if (endExclusive - startInclusive <= pageSize)
@@ -657,17 +683,20 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
 
   private val SQL_SELECT_ACTIVE_CONTRACTS =
     SQL(
-      "select c.*, le.recorded_at, le.transaction from contracts c inner join ledger_entries le on c.transaction_id = le.transaction_id where create_offset <= {offset} and (archive_offset is null or archive_offset > {offset})")
+      "select c.*, le.recorded_at, le.transaction from contracts c inner join ledger_entries le on c.transaction_id = le.transaction_id where create_offset <= {offset} and (archive_offset is null or archive_offset > {offset})",
+    )
 
   private def executeBatchSql(query: String, params: Iterable[Seq[NamedParameter]])(
-      implicit con: Connection) = {
+      implicit con: Connection,
+  ) = {
     require(params.size > 0, "batch sql statement must have at least one set of name parameters")
     BatchSql(query, params.head, params.drop(1).toArray: _*).execute()
   }
 
   private val SQL_TRUNCATE_ACS_TABLES =
     SQL(
-      "truncate contracts, contract_witnesses, contract_key_maintainers, contract_keys, contract_divulgences restrict")
+      "truncate contracts, contract_witnesses, contract_key_maintainers, contract_keys, contract_divulgences restrict",
+    )
 
   private def resetAcs()(implicit conn: Connection): Unit = {
     SQL_TRUNCATE_ACS_TABLES.execute()
@@ -685,7 +714,8 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
       // table. However, it seems safer to reuse the tested ACS implementation from PostgresLedgerDao to
       // recompute the entire ACS.
       logger.info(
-        s"Recomputing all active contract set data in order to add the missing divulgence info")
+        s"Recomputing all active contract set data in order to add the missing divulgence info",
+      )
       resetAcs()
 
       logger.info(s"Processing ledger entries 0 to $ledgerEnd. This may take a while.")
@@ -706,14 +736,16 @@ class V2_1__Rebuild_Acs extends BaseJavaMigration {
 
             val blindingInfo = Blinding.blind(unmappedTx)
             val mappedLocalDivulgence = blindingInfo.localDivulgence.map {
-              case (k, v) => EventIdFormatter.fromTransactionId(tx.transactionId, k) -> v
+              case (k, v) =>
+                EventIdFormatter.fromTransactionId(tx.transactionId, k) -> v
             }
 
             updateActiveContractSet(
               offset,
               tx,
               mappedLocalDivulgence,
-              blindingInfo.globalDivulgence)
+              blindingInfo.globalDivulgence,
+            )
           })
       }
     })
