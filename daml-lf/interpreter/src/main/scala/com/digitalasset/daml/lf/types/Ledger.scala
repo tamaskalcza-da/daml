@@ -693,8 +693,8 @@ object Ledger {
                 optLocation = ex.optLocation,
                 authorizingParties = authParties,
                 requiredParties = actingParties,
-              ),
-          ), )
+              )
+          ))
     }
 
     def authorizeFetch(
@@ -713,8 +713,8 @@ object Ledger {
               optLocation = fetch.optLocation,
               stakeholders = stakeholders,
               authorizingParties = authParties,
-            ),
-        ), )
+            )
+        ))
     }
 
     /*
@@ -1185,7 +1185,7 @@ object Ledger {
                     case NodeFetch(referencedCoid, templateId @ _, optLoc @ _, _, _, _) =>
                       val newCacheP =
                         newCache.updateLedgerNodeInfo(referencedCoid)(info =>
-                          info.copy(referencedBy = info.referencedBy + nodeId), )
+                          info.copy(referencedBy = info.referencedBy + nodeId))
 
                       processNodes(Right(newCacheP), idsToProcess)
 
@@ -1196,7 +1196,7 @@ object Ledger {
                             info.copy(
                               referencedBy = info.referencedBy + nodeId,
                               consumedBy = if (ex.consuming) Some(nodeId) else info.consumedBy,
-                          ), )
+                          ))
                       val newCache1 =
                         if (ex.consuming) {
                           val newCache0_1 = newCache0.markAsInactive(ex.targetCoid)
@@ -1229,7 +1229,7 @@ object Ledger {
                         case Some(referencedCoid) =>
                           val newCacheP =
                             newCache.updateLedgerNodeInfo(referencedCoid)(info =>
-                              info.copy(referencedBy = info.referencedBy + nodeId), )
+                              info.copy(referencedBy = info.referencedBy + nodeId))
 
                           processNodes(Right(newCacheP), idsToProcess)
                       }
