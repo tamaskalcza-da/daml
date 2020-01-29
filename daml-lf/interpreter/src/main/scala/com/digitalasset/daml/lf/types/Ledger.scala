@@ -563,7 +563,7 @@ object Ledger {
         nid: Transaction.NodeId,
         node: Transaction.Node,
     ): (Set[Party], EnrichState) = {
-      val witnesses = parentWitnesses union node.info.informeesOfNode
+      val witnesses = parentWitnesses union node.informeesOfNode
       witnesses ->
         copy(
           disclosures = disclosures

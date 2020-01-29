@@ -18,26 +18,9 @@ import scalaz.syntax.equal._
 object Node {
 
   /** Transaction nodes parametrized over identifier type */
-  sealed trait GenNode[+Nid, +Cid, +Val] extends Product with Serializable {
+  sealed trait GenNode[+Nid, +Cid, +Val] extends Product with Serializable with NodeInfo[Party] {
     def mapContractIdAndValue[Cid2, Val2](f: Cid => Cid2, g: Val => Val2): GenNode[Nid, Cid2, Val2]
     def mapNodeId[Nid2](f: Nid => Nid2): GenNode[Nid2, Cid, Val]
-
-    /** Required authorizers (see ledger model); UNSAFE TO USE on fetch nodes of transaction with versions < 5
-      *
-      * The ledger model defines the fetch node actors as the nodes' required authorizers.
-      * However, the our transaction data structure did not include the actors in versions < 5.
-      * The usage of this method must thus be restricted to:
-      * 1. settings where no fetch nodes appear (for example, the `validate` method of DAMLe, which uses it on root
-      *    nodes, which are guaranteed never to contain a fetch node)
-      * 2. DAML ledger implementations that do not store or process any transactions with version < 5
-      *
-      */
-    def requiredAuthorizers: Set[Party]
-
-    /** Construct the [[NodeInfo]] object for the node. Used for e.g. computing
-      * transaction witnesses.
-      */
-    def info: NodeInfo[Party]
   }
 
   object GenNode extends WithTxValue3[GenNode]
@@ -55,7 +38,7 @@ object Node {
       signatories: Set[Party],
       stakeholders: Set[Party],
       key: Option[KeyWithMaintainers[Val]],
-  ) extends LeafOnlyNode[Cid, Val] {
+  ) extends LeafOnlyNode[Cid, Val] with NodeInfo.Create[Party] {
     override def mapContractIdAndValue[Cid2, Val2](
         f: Cid => Cid2,
         g: Val => Val2,
@@ -63,10 +46,6 @@ object Node {
       copy(coid = f(coid), coinst = coinst.mapValue(g), key = key.map(_.mapValue(g)))
 
     override def mapNodeId[Nid2](f: Nothing => Nid2): NodeCreate[Cid, Val] = this
-
-    override def requiredAuthorizers(): Set[Party] = signatories
-
-    override def info: NodeInfo[Party] = NodeInfo.Create(signatories, stakeholders)
 
   }
 
@@ -80,7 +59,7 @@ object Node {
       actingParties: Option[Set[Party]],
       signatories: Set[Party],
       stakeholders: Set[Party],
-  ) extends LeafOnlyNode[Cid, Nothing] {
+  ) extends LeafOnlyNode[Cid, Nothing] with NodeInfo.Fetch[Party] {
     override def mapContractIdAndValue[Cid2, Val2](
         f: Cid => Cid2,
         g: Nothing => Val2,
@@ -88,14 +67,6 @@ object Node {
       copy(coid = f(coid))
 
     override def mapNodeId[Nid2](f: Nothing => Nid2): NodeFetch[Cid] = this
-
-    /** This blows up on transactions with version <5. The caller must ensure that the transaction is of
-      * this form.
-      */
-    override def requiredAuthorizers: Set[Party] = actingParties.get
-
-    override def info: NodeInfo[Party] =
-      NodeInfo.Fetch(signatories, stakeholders, actingParties.getOrElse(Set.empty))
 
   }
 
@@ -123,7 +94,7 @@ object Node {
       children: ImmArray[Nid],
       exerciseResult: Option[Val],
       key: Option[KeyWithMaintainers[Val]],
-  ) extends GenNode[Nid, Cid, Val] {
+  ) extends GenNode[Nid, Cid, Val] with NodeInfo.Exercise[Party] {
     override def mapContractIdAndValue[Cid2, Val2](
         f: Cid => Cid2,
         g: Val => Val2,
@@ -139,11 +110,6 @@ object Node {
       copy(
         children = children.map(f),
       )
-
-    override def requiredAuthorizers(): Set[Party] = actingParties
-
-    override def info: NodeInfo[Party] =
-      NodeInfo.Exercise(consuming, signatories, stakeholders, actingParties)
   }
 
   object NodeExercises extends WithTxValue3[NodeExercises] {
@@ -188,7 +154,7 @@ object Node {
       optLocation: Option[Location],
       key: KeyWithMaintainers[Val],
       result: Option[Cid],
-  ) extends LeafOnlyNode[Cid, Val] {
+  ) extends LeafOnlyNode[Cid, Val] with NodeInfo.LookupByKey[Party] {
     override def mapContractIdAndValue[Cid2, Val2](
         f: Cid => Cid2,
         g: Val => Val2,
@@ -197,10 +163,9 @@ object Node {
 
     override def mapNodeId[Nid2](f: Nothing => Nid2): NodeLookupByKey[Cid, Val] = this
 
-    override def requiredAuthorizers(): Set[Party] = key.maintainers
+    override def keyMaintainers: Set[Party] = key.maintainers
+    override def hasResult: Boolean = result.isDefined
 
-    override def info: NodeInfo[Party] =
-      NodeInfo.LookupByKey(key.maintainers, result.isDefined)
   }
 
   object NodeLookupByKey extends WithTxValue2[NodeLookupByKey]
