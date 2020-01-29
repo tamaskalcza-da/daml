@@ -19,16 +19,16 @@ trait NodeInfo[PartyRep] extends Product with Serializable {
     */
   def informeesOfNode: Set[PartyRep]
 
-    /** Required authorizers (see ledger model); UNSAFE TO USE on fetch nodes of transaction with versions < 5
-      *
-      * The ledger model defines the fetch node actingParties as the nodes' required authorizers.
-      * However, the our transaction data structure did not include the actingParties in versions < 5.
-      * The usage of this method must thus be restricted to:
-      * 1. settings where no fetch nodes appear (for example, the `validate` method of DAMLe, which uses it on root
-      *    nodes, which are guaranteed never to contain a fetch node)
-      * 2. DAML ledger implementations that do not store or process any transactions with version < 5
-      *
-      */
+  /** Required authorizers (see ledger model); UNSAFE TO USE on fetch nodes of transaction with versions < 5
+    *
+    * The ledger model defines the fetch node actingParties as the nodes' required authorizers.
+    * However, the our transaction data structure did not include the actingParties in versions < 5.
+    * The usage of this method must thus be restricted to:
+    * 1. settings where no fetch nodes appear (for example, the `validate` method of DAMLe, which uses it on root
+    *    nodes, which are guaranteed never to contain a fetch node)
+    * 2. DAML ledger implementations that do not store or process any transactions with version < 5
+    *
+    */
   def requiredAuthorizers: Set[PartyRep]
 }
 

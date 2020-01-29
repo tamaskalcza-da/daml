@@ -38,7 +38,8 @@ object Node {
       signatories: Set[Party],
       stakeholders: Set[Party],
       key: Option[KeyWithMaintainers[Val]],
-  ) extends LeafOnlyNode[Cid, Val] with NodeInfo.Create[Party] {
+  ) extends LeafOnlyNode[Cid, Val]
+      with NodeInfo.Create[Party] {
     override def mapContractIdAndValue[Cid2, Val2](
         f: Cid => Cid2,
         g: Val => Val2,
@@ -59,7 +60,8 @@ object Node {
       actingParties: Option[Set[Party]],
       signatories: Set[Party],
       stakeholders: Set[Party],
-  ) extends LeafOnlyNode[Cid, Nothing] with NodeInfo.Fetch[Party] {
+  ) extends LeafOnlyNode[Cid, Nothing]
+      with NodeInfo.Fetch[Party] {
     override def mapContractIdAndValue[Cid2, Val2](
         f: Cid => Cid2,
         g: Nothing => Val2,
@@ -94,7 +96,8 @@ object Node {
       children: ImmArray[Nid],
       exerciseResult: Option[Val],
       key: Option[KeyWithMaintainers[Val]],
-  ) extends GenNode[Nid, Cid, Val] with NodeInfo.Exercise[Party] {
+  ) extends GenNode[Nid, Cid, Val]
+      with NodeInfo.Exercise[Party] {
     override def mapContractIdAndValue[Cid2, Val2](
         f: Cid => Cid2,
         g: Val => Val2,
@@ -154,7 +157,8 @@ object Node {
       optLocation: Option[Location],
       key: KeyWithMaintainers[Val],
       result: Option[Cid],
-  ) extends LeafOnlyNode[Cid, Val] with NodeInfo.LookupByKey[Party] {
+  ) extends LeafOnlyNode[Cid, Val]
+      with NodeInfo.LookupByKey[Party] {
     override def mapContractIdAndValue[Cid2, Val2](
         f: Cid => Cid2,
         g: Val => Val2,
@@ -247,11 +251,11 @@ object Node {
     */
   case class GlobalKey(templateId: Identifier, key: VersionedValue[Nothing])
 
-  sealed trait WithTxValue2[F[+_, +_]] {
+  sealed trait WithTxValue2[F[+ _, + _]] {
     type WithTxValue[+Cid] = F[Cid, Transaction.Value[Cid]]
   }
 
-  sealed trait WithTxValue3[F[+_, +_, +_]] {
+  sealed trait WithTxValue3[F[+ _, + _, + _]] {
     type WithTxValue[+Nid, +Cid] = F[Nid, Cid, Transaction.Value[Cid]]
   }
 }
