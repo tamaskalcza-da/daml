@@ -70,7 +70,7 @@ object SandboxIndexAndWriteService {
     SqlLedger
       .owner(
         jdbcUrl,
-        Some(ledgerId),
+        ledgerId,
         participantId,
         timeProvider,
         acs,

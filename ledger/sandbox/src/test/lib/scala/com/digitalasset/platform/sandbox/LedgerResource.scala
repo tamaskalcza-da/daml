@@ -63,7 +63,7 @@ object LedgerResource {
         ledger = fromResourceOwner(
           SqlLedger.owner(
             postgres.value.jdbcUrl,
-            Some(ledgerId),
+            ledgerId,
             participantId,
             timeProvider,
             InMemoryActiveLedgerState.empty,

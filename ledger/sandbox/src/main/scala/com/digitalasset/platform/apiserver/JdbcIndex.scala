@@ -23,7 +23,7 @@ object JdbcIndex {
       jdbcUrl: String,
       metrics: MetricRegistry,
   )(implicit mat: Materializer, logCtx: LoggingContext): Resource[IndexService] =
-    ReadOnlySqlLedger(jdbcUrl, Some(ledgerId), metrics).map { ledger =>
+    ReadOnlySqlLedger(jdbcUrl, ledgerId, metrics).map { ledger =>
       val contractStore = new SandboxContractStore(ledger)
       new LedgerBackedIndexService(
         MeteredReadOnlyLedger(ledger, metrics),

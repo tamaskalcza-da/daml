@@ -4,7 +4,6 @@
 package com.digitalasset.platform.sandbox.stores.ledger.sql
 
 import java.time.Instant
-import java.util.UUID
 
 import akka.Done
 import akka.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
@@ -38,7 +37,6 @@ import com.digitalasset.platform.index.store.{
   FlywayMigrations,
   PersistenceEntry
 }
-import com.digitalasset.platform.sandbox.LedgerIdGenerator
 import com.digitalasset.platform.sandbox.stores.InMemoryActiveLedgerState
 import com.digitalasset.platform.sandbox.stores.ledger.Ledger
 import com.digitalasset.platform.sandbox.stores.ledger.ScenarioLoader.LedgerEntryOrBump
@@ -62,7 +60,7 @@ object SqlLedger {
   //jdbcUrl must have the user/password encoded in form of: "jdbc:postgresql://localhost/test?user=fred&password=secret"
   def owner(
       jdbcUrl: String,
-      ledgerId: Option[LedgerId],
+      ledgerId: LedgerId,
       participantId: ParticipantId,
       timeProvider: TimeProvider,
       acs: InMemoryActiveLedgerState,
@@ -298,7 +296,7 @@ private final class SqlLedger(
             Some(submissionId),
             participantId,
             timeProvider.getCurrentTime,
-            PartyDetails(party, displayName, true))
+            PartyDetails(party, displayName, isLocal = true))
         )
         .map(_ => ())(DEC)
         .recover {
@@ -407,7 +405,7 @@ private final class SqlLedgerFactory(ledgerDao: LedgerDao)(implicit logCtx: Logg
     * @return a compliant Ledger implementation
     */
   def createSqlLedger(
-      initialLedgerId: Option[LedgerId],
+      initialLedgerId: LedgerId,
       participantId: ParticipantId,
       timeProvider: TimeProvider,
       startMode: SqlStartMode,
@@ -449,7 +447,7 @@ private final class SqlLedgerFactory(ledgerDao: LedgerDao)(implicit logCtx: Logg
     ledgerDao.reset()
 
   private def initialize(
-      initialLedgerId: Option[LedgerId],
+      initialLedgerId: LedgerId,
       timeProvider: TimeProvider,
       acs: InMemoryActiveLedgerState,
       packages: InMemoryPackageStore,
@@ -458,70 +456,51 @@ private final class SqlLedgerFactory(ledgerDao: LedgerDao)(implicit logCtx: Logg
     // headRef. We also are not concerns with heartbeats / checkpoints. This is OK since this initialization
     // step happens before we start up the sql ledger at all, so it's running in isolation.
 
-    initialLedgerId match {
-      case Some(initialId) =>
-        ledgerDao
-          .lookupLedgerId()
-          .flatMap {
-            case Some(foundLedgerId) if (foundLedgerId == initialId) =>
-              if (initialLedgerEntries.nonEmpty) {
-                logger.warn(
-                  s"Initial ledger entries provided, presumably from scenario, but I'm picking up from an existing database, and thus they will not be used")
-              }
-              if (packages.listLfPackagesSync().nonEmpty) {
-                logger.warn(
-                  s"Initial packages provided, presumably as command line arguments, but I'm picking up from an existing database, and thus they will not be used")
-              }
-              ledgerFound(foundLedgerId)
-            case Some(foundLedgerId) =>
-              val errorMsg =
-                s"Ledger id mismatch. Ledger id given ('$initialId') is not equal to the existing one ('$foundLedgerId')!"
-              logger.error(errorMsg)
-              sys.error(errorMsg)
-            case None =>
-              if (initialLedgerEntries.nonEmpty) {
-                logger.info(
-                  s"Initializing ledger with ${initialLedgerEntries.length} ledger entries")
-              }
+    ledgerDao
+      .lookupLedgerId()
+      .flatMap {
+        case Some(foundLedgerId) if foundLedgerId == initialLedgerId =>
+          if (initialLedgerEntries.nonEmpty) {
+            logger.warn(
+              s"Initial ledger entries provided, presumably from scenario, but I'm picking up from an existing database, and thus they will not be used")
+          }
+          if (packages.listLfPackagesSync().nonEmpty) {
+            logger.warn(
+              s"Initial packages provided, presumably as command line arguments, but I'm picking up from an existing database, and thus they will not be used")
+          }
+          ledgerFound(foundLedgerId)
+        case Some(foundLedgerId) =>
+          val errorMsg =
+            s"Ledger id mismatch. Ledger id given ('$initialLedgerId') is not equal to the existing one ('$foundLedgerId')!"
+          logger.error(errorMsg)
+          sys.error(errorMsg)
+        case None =>
+          if (initialLedgerEntries.nonEmpty) {
+            logger.info(s"Initializing ledger with ${initialLedgerEntries.length} ledger entries")
+          }
 
-              val contracts = acs.activeContracts.values.toList
+          val contracts = acs.activeContracts.values.toList
 
-              val initialLedgerEnd = 0L
-              val entriesWithOffset = initialLedgerEntries.foldLeft(
-                (initialLedgerEnd, immutable.Seq.empty[(Long, LedgerEntry)]))((acc, le) => {
-                val offset = acc._1
-                val seq = acc._2
-                le match {
-                  case LedgerEntryOrBump.Entry(entry) =>
-                    (offset + 1, seq :+ offset -> entry)
-                  case LedgerEntryOrBump.Bump(increment) =>
-                    (offset + increment, seq)
-                }
-              })
+          val initialLedgerEnd = 0L
+          val entriesWithOffset = initialLedgerEntries.foldLeft(
+            (initialLedgerEnd, immutable.Seq.empty[(Long, LedgerEntry)]))((acc, le) => {
+            val offset = acc._1
+            val seq = acc._2
+            le match {
+              case LedgerEntryOrBump.Entry(entry) =>
+                (offset + 1, seq :+ offset -> entry)
+              case LedgerEntryOrBump.Bump(increment) =>
+                (offset + increment, seq)
+            }
+          })
 
-              implicit val ec: ExecutionContext = DEC
-              for {
-                _ <- doInit(initialId)
-                _ <- copyPackages(packages, timeProvider.getCurrentTime, entriesWithOffset._1)
-                _ <- ledgerDao.storeInitialState(
-                  contracts,
-                  entriesWithOffset._2,
-                  entriesWithOffset._1)
-              } yield { initialId }
-
-          }(DEC)
-
-      case None =>
-        logger.info("No ledger id given. Looking for existing ledger in database.")
-        ledgerDao
-          .lookupLedgerId()
-          .flatMap {
-            case Some(foundLedgerId) => ledgerFound(foundLedgerId)
-            case None =>
-              val randomLedgerId = LedgerIdGenerator.generateRandomId()
-              doInit(randomLedgerId).map(_ => randomLedgerId)(DEC)
-          }(DEC)
-    }
+          implicit val ec: ExecutionContext = DEC
+          for {
+            _ <- doInit(initialLedgerId)
+            _ <- copyPackages(packages, timeProvider.getCurrentTime, entriesWithOffset._1)
+            _ <- ledgerDao.storeInitialState(contracts, entriesWithOffset._2, entriesWithOffset._1)
+          } yield initialLedgerId
+      }(DEC)
   }
 
   private def ledgerFound(foundLedgerId: LedgerId) = {
@@ -542,7 +521,6 @@ private final class SqlLedgerFactory(ledgerDao: LedgerDao)(implicit logCtx: Logg
     val packageDetails = store.listLfPackagesSync()
     if (packageDetails.nonEmpty) {
       logger.info(s"Copying initial packages ${packageDetails.keys.mkString(",")}")
-      val submissionId = UUID.randomUUID().toString
       val packages = packageDetails.toList.map(pkg => {
         val archive =
           store.getLfArchiveSync(pkg._1).getOrElse(sys.error(s"Package ${pkg._1} not found"))

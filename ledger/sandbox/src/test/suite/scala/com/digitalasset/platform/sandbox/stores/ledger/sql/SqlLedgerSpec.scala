@@ -11,9 +11,9 @@ import com.digitalasset.ledger.api.health.{Healthy, Unhealthy}
 import com.digitalasset.ledger.api.testing.utils.AkkaBeforeAndAfterAll
 import com.digitalasset.logging.LoggingContext.newLoggingContext
 import com.digitalasset.platform.apiserver.InMemoryPackageStore
-import com.digitalasset.platform.sandbox.MetricsAround
 import com.digitalasset.platform.sandbox.stores.InMemoryActiveLedgerState
 import com.digitalasset.platform.sandbox.stores.ledger.Ledger
+import com.digitalasset.platform.sandbox.{LedgerIdGenerator, MetricsAround}
 import com.digitalasset.resources.Resource
 import com.digitalasset.testing.postgresql.PostgresAroundEach
 import org.scalatest.concurrent.{AsyncTimeLimitedTests, Eventually, ScaledTimeSpans}
@@ -130,17 +130,14 @@ class SqlLedgerSpec
   }
 
   private def createSqlLedger(): Future[Ledger] =
-    createSqlLedger(None)
-
-  private def createSqlLedger(ledgerId: LedgerId): Future[Ledger] =
-    createSqlLedger(Some(ledgerId))
+    createSqlLedger(LedgerIdGenerator.generateRandomId())
 
   private def createSqlLedger(ledgerId: String): Future[Ledger] = {
     val assertedLedgerId: LedgerId = LedgerId(Ref.LedgerString.assertFromString(ledgerId))
-    createSqlLedger(Some(assertedLedgerId))
+    createSqlLedger(assertedLedgerId)
   }
 
-  private def createSqlLedger(ledgerId: Option[LedgerId]): Future[Ledger] = {
+  private def createSqlLedger(ledgerId: LedgerId): Future[Ledger] = {
     metrics.getNames.forEach(name => { val _ = metrics.remove(name) })
     val ledger = newLoggingContext { implicit logCtx =>
       SqlLedger
