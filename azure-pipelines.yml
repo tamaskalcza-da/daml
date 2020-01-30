@@ -24,6 +24,7 @@ jobs:
       - bash: |
           set -euo pipefail
           echo "##vso[task.setvariable variable=git_sha;isOutput=true]$(git rev-parse 'HEAD^2')"
+        name: out
 
   - job: collect_build_data
     condition: always()
@@ -38,7 +39,7 @@ jobs:
       # Note: These Azure variables are only set for PR builds.
       pr.num: $[ variables['System.PullRequest.PullRequestNumber'] ]
       pr.branch: $[ variables['System.PullRequest.SourceBranch'] ]
-      git_sha: $[ dependencies.get_git_sha.outputs['git_sha'] ]
+      git_sha: $[ dependencies.get_git_sha.outputs['out.git_sha'] ]
     steps:
       # some change in Azure configuration makes this fail recently (2020-01).
       # Azure runs PR builds not on the PR commit, but on the GitHub-provided
