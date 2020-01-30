@@ -17,8 +17,18 @@ pr:
       - master
 
 jobs:
+  - job: get_git_sha
+    pool:
+      name: "linux-pool"
+    steps:
+      - bash: |
+          set -euo pipefail
+          echo "##vso[task.setvariable variable=git_sha;isOutput=true]$(git rev-parse 'HEAD^2')"
+
   - job: collect_build_data
     condition: always()
+    dependsOn:
+      - get_git_sha
     pool:
       name: "linux-pool"
     variables:
@@ -43,8 +53,8 @@ jobs:
           eval "$(./dev-env/bin/dade-assist)"
 
           echo "Build.SourceVersion: $(Build.SourceVersion)"
+          echo "$[ dependencies.get_git_sha.git_sha ]"
 
-          git fetch origin ede196daf114189471bfd107d7ff1866981e130a
 
           tell_slack () {
             local MESSAGE=$1
