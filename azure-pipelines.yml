@@ -54,7 +54,7 @@ jobs:
           eval "$(./dev-env/bin/dade-assist)"
 
           echo "Build.SourceVersion: $(Build.SourceVersion)"
-          echo "git_sha: $git_sha"
+          echo "git_sha: $(git_sha)"
 
 
           tell_slack () {
