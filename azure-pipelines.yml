@@ -67,6 +67,10 @@ jobs:
                  --data "{\"text\":\"<!here> *FAILED* $(Agent.JobName): <https://dev.azure.com/digitalasset/daml/_build/results?buildId=$(Build.BuildId)|$MESSAGE>\n\"}" \
                  $(Slack.URL)
           }
+          echo "Build.QueuedBy: $(Build.QueuedBy)"
+          echo "Build.RequestedFor: $(Build.RequestedFor)"
+          echo "Build.RequestedForEmail: $(Build.RequestedForEmail)"
+          echo "Build.RequestedForId: $(Build.RequestedForEmail)"
 
           REPORT=$(mktemp)
         env:
