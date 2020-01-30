@@ -42,6 +42,10 @@ jobs:
           set -euo pipefail
           eval "$(./dev-env/bin/dade-assist)"
 
+          echo "Build.SourceVersion: $(Build.SourceVersion)"
+
+          git fetch origin ede196daf114189471bfd107d7ff1866981e130a
+
           tell_slack () {
             local MESSAGE=$1
             curl -XPOST \
