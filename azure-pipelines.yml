@@ -68,6 +68,7 @@ jobs:
                  $(Slack.URL)
           }
           echo "Build.QueuedBy: $(Build.QueuedBy)"
+          echo "Build.QueuedById: $(Build.QueuedById)"
           echo "Build.RequestedFor: $(Build.RequestedFor)"
           echo "Build.RequestedForEmail: $(Build.RequestedForEmail)"
           echo "Build.RequestedForId: $(Build.RequestedForEmail)"
